@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Push</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;touch-action:none;width:min(92vw,460px);padding:12px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow)}
+.g{display:grid;grid-template-columns:repeat(9,1fr);gap:2px}
+.g i{aspect-ratio:1;border-radius:22%;position:relative;background:var(--cell)}
+.g i.w{background:linear-gradient(160deg,#6e6e73,#48484a)}
+.g i.t::after{content:"";position:absolute;inset:36%;border-radius:50%;background:var(--green)}
+.g i.b::before{content:"";position:absolute;inset:8%;border-radius:20%;background:linear-gradient(160deg,#ffb454,#e07a10);box-shadow:inset 0 -3px 4px rgba(0,0,0,.25),0 2px 3px rgba(0,0,0,.25)}
+.g i.b.t::before{background:linear-gradient(160deg,#6ee08a,#25a244)}
+.g i.b.t::after{display:none}
+.g i.p::after{content:"";position:absolute;inset:14%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#7fc0ff,#0a6fe0);box-shadow:0 2px 4px rgba(0,0,0,.35)}
+.ctrl{display:flex;gap:10px}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Push</h1><div class="right"><button class="btn sec" id="newbtn">New Level</button></div></header><main>
+<div class="seg" id="seg"><button data-k="2">2 boxes</button><button class="on" data-k="3">3 boxes</button><button data-k="4">4 boxes</button></div>
+<div class="stats"><div class="stat"><small>Moves</small><b id="mv">0</b></div><div class="stat"><small>Levels</small><b id="lv">0</b></div></div>
+<div class="wrap"><div class="g" id="g"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Solved</h2><p></p><button class="btn">Next Level</button></div></div></div>
+<div class="ctrl"><button class="btn sec" id="undo">Undo</button><button class="btn sec" id="rs">Restart</button></div>
+<div class="hint">Push every box onto a goal. Arrow keys, WASD or swipe. Z undoes. Boxes can't be pulled.</div></main><script src="controls.js"></script><script src="common.js"></script><script>
+const S=9;let wl,goals,bx,pr,pc,hist,mv,lv=+ls('pushLv')||0,K=3,start;const ov=$('ov'),gr=$('g');
+for(let i=0;i<S*S;i++)gr.append(document.createElement('i'));
+function gen(k){for(let tries=0;tries<500;tries++){
+  const w=Array.from({length:S},(_,r)=>Array.from({length:S},(_,c)=>r===0||c===0||r===S-1||c===S-1?1:0));
+  for(let i=0;i<8;i++){const r=1+rnd(S-2),c=1+rnd(S-2);w[r][c]=1}
+  const fl=[];for(let r=1;r<S-1;r++)for(let c=1;c<S-1;c++)if(!w[r][c])fl.push([r,c]);if(fl.length<30)continue;
+  shuffle(fl);const gs=fl.slice(0,k),b=Array.from({length:S},()=>Array(S).fill(0));gs.forEach(([r,c])=>b[r][c]=1);
+  let[r,c]=fl[k];for(let st=0;st<600;st++){const[dr,dc]=[[0,1],[1,0],[0,-1],[-1,0]][rnd(4)],tr=r+dr,tc=c+dc;if(w[tr][tc]||b[tr][tc])continue;const br=r-dr,bc=c-dc;if(b[br][bc]&&Math.random()<.7){b[br][bc]=0;b[r][c]=1}r=tr;c=tc}
+  const off=gs.filter(([a,z])=>!b[a][z]).length;if(off<Math.ceil(k*.75))continue;return{w,gs,b,r,c}}return null}
+// A simple solvable board with the selected box count if random generation runs out of tries.
+function fallbackLevel(k) {
+  const w = Array.from({length:S}, (_, r) => Array.from({length:S}, (_, c) =>
+    Number(r === 0 || c === 0 || r === S-1 || c === S-1)));
+  const gs = Array.from({length:k}, (_, i) => [2, i + 2]);
+  const b = Array.from({length:S}, () => Array(S).fill(0));
+  for (const [, c] of gs) b[3][c] = 1;
+  return {w, gs, b, r:5, c:4};
+}
+let solved, resultTimer;
+function load(){clearTimeout(resultTimer);solved=false;const L=gen(K)||fallbackLevel(K);wl=L.w;goals=L.gs;bx=L.b;pr=L.r;pc=L.c;start=JSON.stringify([bx,pr,pc]);hist=[];mv=0;ov.classList.add('hide');render()}
+function render(){[...gr.children].forEach((e,i)=>{const r=i/S|0,c=i%S;e.className=(wl[r][c]?'w':'')+(goals.some(g=>g[0]===r&&g[1]===c)?' t':'')+(bx[r][c]?' b':'')+(pr===r&&pc===c?' p':'')});$('mv').textContent=mv;$('lv').textContent=lv}
+function move(dr,dc){if(solved||!ov.classList.contains('hide'))return;const r=pr+dr,c=pc+dc;if(wl[r][c])return;const snap=JSON.stringify([bx,pr,pc]);
+  if(bx[r][c]){const r2=r+dr,c2=c+dc;if(wl[r2][c2]||bx[r2][c2])return;bx[r][c]=0;bx[r2][c2]=1}hist.push(snap);pr=r;pc=c;mv++;render();
+  if(goals.every(([a,z])=>bx[a][z])){solved=true;lv++;ls('pushLv',lv);render();resultTimer=setTimeout(()=>overlay(ov,'Solved',mv+' moves','Next Level',load),300)}}
+bindGameKeys({
+  ArrowUp: () => move(-1, 0), ArrowDown: () => move(1, 0),
+  ArrowLeft: () => move(0, -1), ArrowRight: () => move(0, 1),
+  z: () => $('undo').click()
+});
+let sx,sy;gr.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY});gr.addEventListener('pointercancel',()=>sx=null);gr.addEventListener('pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=null;if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;Math.abs(dx)>Math.abs(dy)?move(0,dx<0?-1:1):move(dy<0?-1:1,0)});
+$('undo').onclick=()=>{if(!solved&&hist.length&&ov.classList.contains('hide')){[bx,pr,pc]=JSON.parse(hist.pop());mv--;render()}};$('rs').onclick=()=>{clearTimeout(resultTimer);solved=false;ov.classList.add('hide');[bx,pr,pc]=JSON.parse(start);hist=[];mv=0;render()};
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;K=+b.dataset.k;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));load()};
+$('newbtn').onclick=load;load();</script></body></html>

@@ -1,0 +1,193 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pocket Arcade</title><link rel="stylesheet" href="shared.css">
+<style>
+.wrap { display:grid; grid-template-columns:198px minmax(0,1fr); min-height:100vh; }
+.sidebar { position:sticky; top:0; align-self:start; top:14px; height:calc(100vh - 28px); padding:16px 9px; margin:14px 0 14px 14px;
+  border-radius:24px; background:var(--glass); box-shadow:var(--glass-shadow);
+  -webkit-backdrop-filter:blur(28px) saturate(145%); backdrop-filter:blur(28px) saturate(145%); }
+.brand { display:flex; align-items:center; gap:8px; padding:0 8px; margin:0 0 26px; font-size:16px; font-weight:650; letter-spacing:-.025em; }
+.brand img { width:32px; height:32px; }
+.chips { display:flex; flex-direction:column; gap:2px; }
+.chips button { display:flex; align-items:center; gap:9px; border:0; border-radius:12px; padding:7px 10px; min-height:32px; background:transparent; color:var(--text); text-align:left; white-space:nowrap; font-size:13px; cursor:pointer; }
+.chips button:hover { background:var(--cell); }
+.chips button.on { background:var(--control); box-shadow:var(--glass-shadow); color:var(--accent-text); font-weight:620; }
+.chips button::before { content:""; flex:none; width:18px; height:18px; background:var(--accent-text); -webkit-mask:url(category-symbols.png) var(--icon-x) center / 126px 18px no-repeat; mask:url(category-symbols.png) var(--icon-x) center / 126px 18px no-repeat; }
+.chips [data-f="all"] { --icon-x:0; }
+.chips [data-f="recent"] { --icon-x:-18px; }
+.chips [data-f="arcade"] { --icon-x:-36px; margin-top:16px; }
+.chips [data-f="puzzle"] { --icon-x:-54px; }
+.chips [data-f="cards"] { --icon-x:-72px; }
+.chips [data-f="board"] { --icon-x:-90px; }
+.chips [data-f="skill"] { --icon-x:-108px; }
+.library { width:100%; max-width:1440px; padding:30px clamp(18px,3vw,40px) 45px; margin:0 auto; }
+.catalog-head { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 16px; }
+.catalog-head h1 { margin:0; font-size:29px; font-weight:700; letter-spacing:-.04em; line-height:1.18; }
+.search { position:relative; display:flex; align-items:center; width:min(44%,244px); }
+.search::before { content:""; position:absolute; left:11px; width:9px; height:9px; border:1.6px solid var(--sub); border-radius:50%; transform:translateY(-1px); pointer-events:none; }
+.search::after { content:""; position:absolute; left:21px; width:5px; height:1.6px; background:var(--sub); transform:translateY(5px) rotate(45deg); pointer-events:none; }
+.search input { width:100%; height:33px; padding:0 32px; appearance:none; color:var(--text); background:var(--control); border:1px solid var(--rim); border-radius:999px; box-shadow:inset 0 1px 0 var(--shine); font:13px var(--font); }
+.search kbd { position:absolute; right:10px; color:var(--sub); font:11px var(--font); padding:0 4px; border:1px solid var(--line); border-radius:3px; pointer-events:none; }
+.search:focus-within kbd { display:none; }
+.search input:focus { padding-right:10px; }
+.catalog-meta { display:flex; justify-content:space-between; align-items:center; gap:12px; margin:0 0 14px; color:var(--sub); font-size:12px; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(185px,1fr)); gap:10px; }
+a.g { display:flex; align-items:center; gap:12px; min-width:0; padding:12px; border-radius:17px; background:linear-gradient(145deg,rgba(255,255,255,.07),transparent 65%),var(--panel); box-shadow:var(--glass-shadow); -webkit-backdrop-filter:blur(16px) saturate(135%); backdrop-filter:blur(16px) saturate(135%); color:inherit; text-decoration:none; transition:box-shadow .12s,background .12s; }
+a.g:hover { background:var(--control); box-shadow:var(--glass-shadow); }
+a.g:active { background:var(--selection); }
+.ic { flex:none; width:44px; height:44px; border-radius:11px; display:grid; place-items:center; box-shadow:inset 0 0 0 .5px rgba(0,0,0,.11),inset 0 1px 0 rgba(255,255,255,.16); }
+.ic svg { width:28px; height:28px; }
+.ic b { color:#fff; font-size:16px; font-weight:750; letter-spacing:-.04em; }
+.nm { font-size:14px; font-weight:620; letter-spacing:-.015em; }
+.ds { color:var(--sub); font-size:12px; margin-top:2px; }
+.empty { text-align:center; padding:45px 8px; }.empty p { margin:0 0 12px; }
+@media(min-width:731px) { .mac-library .sidebar { visibility:hidden; } }
+@media(prefers-reduced-transparency:reduce) { .sidebar,a.g { -webkit-backdrop-filter:none; backdrop-filter:none; } }
+@media(max-width:730px) {
+  .wrap { display:flex; flex-direction:column; padding:20px 15px 36px; }
+  .sidebar,.library { display:contents; }.brand { display:none; }
+  .catalog-head { order:1; }.chips { order:2; flex-direction:row; overflow-x:auto; gap:3px; margin:0 0 14px; scrollbar-width:thin; }
+  .chips [data-f="arcade"] { margin:0; }.chips button { min-height:32px; padding:6px 9px; }.chips button::before { display:none; }
+  .catalog-meta { order:3; }.grid { order:4; }.empty { order:5; }
+}
+@media(max-width:520px) {
+  .catalog-head { align-items:stretch; flex-direction:column; gap:12px; }.catalog-head h1 {font-size:26px}
+  .search { width:100%; }.search input { height:38px; font-size:16px; }
+  .grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  a.g { padding:10px; gap:8px; }.ic { width:34px; height:34px; border-radius:9px; }.ic svg { width:23px; height:23px; }.ic b { font-size:12px; }
+  .catalog-meta .keys { display:none; }
+}
+@media(pointer:coarse) { .catalog-meta .keys,.search kbd { display:none; }.chips button { min-height:40px; } }
+</style></head><body>
+<div class="wrap">
+<aside class="sidebar"><div class="brand"><img src="launcher-mark.png" width="32" height="32" alt="">Pocket Arcade</div>
+<nav class="chips" id="chips" aria-label="Game categories">
+<button class="on" data-f="all" aria-pressed="true">All Games</button><button data-f="recent" hidden>Recently Played</button><button data-f="arcade">Arcade</button><button data-f="puzzle">Puzzle</button><button data-f="cards">Cards &amp; Dice</button><button data-f="board">Board</button><button data-f="skill">Word &amp; Skill</button></nav></aside>
+<div class="library"><header class="catalog-head"><h1 id="sectionTitle">All Games</h1>
+<label class="search"><input id="search" type="search" placeholder="Search games" aria-label="Search games" autocomplete="off" spellcheck="false" aria-controls="grid"><kbd aria-hidden="true">/</kbd></label></header>
+<div class="catalog-meta"><span id="count" role="status"></span><span class="keys">WASD or arrows to browse · Return to play</span></div>
+<div class="grid" id="grid">
+<a class="g" data-c="arcade" href="rally.html"><div class="ic" aria-hidden="true" style="background:linear-gradient(160deg,#f0783f,#bd3419)"><svg viewBox="0 0 48 48"><path fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" d="M11 40V9m1 2c8-6 14 5 25-1v17c-11 6-17-6-25 1"/><path fill="#fff" d="M13 12h6v5h-6zm6 5h6v5h-6zm6-3h6v5h-6zm6 5h5v5h-5z"/></svg></div><div><div class="nm">Rally</div><div class="ds">Race four circuits</div></div></a>
+<a class="g" data-c="arcade" href="cycles.html"><div class="ic" aria-hidden="true" style="background:linear-gradient(160deg,#6267cf,#332988)"><svg viewBox="0 0 48 48"><g fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path stroke="#8de9ff" d="M7 37h13V23h11"/><path stroke="#fff" d="M40 11H24v6H12"/></g><circle cx="32" cy="23" r="3.6" fill="#b7f6ff"/><circle cx="11" cy="17" r="3.6" fill="#fff"/></svg></div><div><div class="nm">Light Cycles</div><div class="ds">Duel a friend or the CPU</div></div></a>
+<a class="g" data-c="puzzle" href="picross.html"><div class="ic" aria-hidden="true" style="background:linear-gradient(160deg,#38baac,#197771)"><svg viewBox="0 0 48 48"><g fill="white"><rect x="8" y="8" width="8" height="8" rx="2" opacity=".45"/><rect x="20" y="8" width="8" height="8" rx="2"/><rect x="32" y="8" width="8" height="8" rx="2" opacity=".45"/><rect x="8" y="20" width="8" height="8" rx="2"/><rect x="20" y="20" width="8" height="8" rx="2"/><rect x="32" y="20" width="8" height="8" rx="2"/><rect x="8" y="32" width="8" height="8" rx="2" opacity=".45"/><rect x="20" y="32" width="8" height="8" rx="2"/><rect x="32" y="32" width="8" height="8" rx="2" opacity=".45"/></g></svg></div><div><div class="nm">Daily Picross</div><div class="ds">Solve a daily nonogram</div></div></a>
+<a class="g" data-c="puzzle" href="2048.html"><div class="ic" style="background:linear-gradient(160deg,#ff9f0a,#ff6a00)"><b>2048</b></div><div><div class="nm">2048</div><div class="ds">Merge tiles</div></div></a>
+<a class="g" data-c="arcade" href="snake.html"><div class="ic" style="background:linear-gradient(160deg,#34d058,#1f9d3f)"><svg viewBox="0 0 48 48"><path d="M10 38h18a7 7 0 0 0 0-14h-8a7 7 0 0 1 0-14h18" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/><circle cx="38" cy="10" r="2.6" fill="#1f9d3f"/></svg></div><div><div class="nm">Snake</div><div class="ds">Eat and grow</div></div></a>
+<a class="g" data-c="puzzle" href="minesweeper.html"><div class="ic" style="background:linear-gradient(160deg,#5ac8fa,#0a84ff)"><svg viewBox="0 0 48 48"><rect x="13" y="7" width="3.5" height="34" rx="1.5" fill="#fff"/><path d="M16.5 8l19 8-19 8z" fill="#fff"/><rect x="8" y="39" width="24" height="3.5" rx="1.7" fill="#fff"/></svg></div><div><div class="nm">Minesweeper</div><div class="ds">Clear the field</div></div></a>
+<a class="g" data-c="puzzle" href="memory.html"><div class="ic" style="background:linear-gradient(160deg,#d16cf5,#7d3cf0)"><svg viewBox="0 0 48 48"><rect x="7" y="9" width="21" height="29" rx="5" fill="#fff" opacity=".55" transform="rotate(-10 17 24)"/><rect x="20" y="9" width="21" height="29" rx="5" fill="#fff" transform="rotate(8 30 24)"/></svg></div><div><div class="nm">Memory</div><div class="ds">Match the pairs</div></div></a>
+<a class="g" data-c="arcade" href="breakout.html"><div class="ic" style="background:linear-gradient(160deg,#ff6b81,#ff2d55)"><svg viewBox="0 0 48 48"><rect x="6" y="8" width="11" height="6" rx="2" fill="#fff"/><rect x="19" y="8" width="11" height="6" rx="2" fill="#fff" opacity=".7"/><rect x="32" y="8" width="10" height="6" rx="2" fill="#fff"/><circle cx="26" cy="30" r="3.4" fill="#fff"/><rect x="12" y="40" width="24" height="4" rx="2" fill="#fff"/></svg></div><div><div class="nm">Breakout</div><div class="ds">Break the bricks</div></div></a>
+<a class="g" data-c="arcade" href="tetris.html"><div class="ic" style="background:linear-gradient(160deg,#40e0d0,#00a0a8)"><svg viewBox="0 0 48 48"><g fill="#fff"><rect x="9" y="10" width="10" height="10" rx="3"/><rect x="19" y="10" width="10" height="10" rx="3" opacity=".75"/><rect x="29" y="10" width="10" height="10" rx="3"/><rect x="19" y="20" width="10" height="10" rx="3"/><rect x="19" y="30" width="10" height="10" rx="3" opacity=".75"/></g></svg></div><div><div class="nm">Tetris</div><div class="ds">Stack and clear</div></div></a>
+<a class="g" data-c="board" href="connect4.html"><div class="ic" style="background:linear-gradient(160deg,#6e6cf0,#3b39b8)"><svg viewBox="0 0 48 48"><circle cx="15" cy="15" r="7" fill="#ff453a"/><circle cx="33" cy="15" r="7" fill="#fff" opacity=".35"/><circle cx="15" cy="33" r="7" fill="#fff" opacity=".35"/><circle cx="33" cy="33" r="7" fill="#ffd60a"/></svg></div><div><div class="nm">Connect Four</div><div class="ds">Beat the computer</div></div></a>
+<a class="g" data-c="puzzle" href="sudoku.html"><div class="ic" style="background:linear-gradient(160deg,#9a9aa0,#48484a)"><svg viewBox="0 0 48 48"><rect x="8" y="8" width="32" height="32" rx="6" fill="none" stroke="#fff" stroke-width="3"/><path d="M18.7 8v32M29.3 8v32M8 18.7h32M8 29.3h32" stroke="#fff" stroke-width="2" opacity=".6"/></svg></div><div><div class="nm">Sudoku</div><div class="ds">Fill the grid</div></div></a>
+<a class="g" data-c="arcade" href="flap.html"><div class="ic" style="background:linear-gradient(160deg,#ffe14d,#f5b800)"><svg viewBox="0 0 48 48"><circle cx="22" cy="26" r="13" fill="#fff"/><circle cx="26" cy="22" r="4" fill="#1c1c1e"/><path d="M33 27l9 3-9 4z" fill="#ff9f0a"/></svg></div><div><div class="nm">Flap</div><div class="ds">Fly through gaps</div></div></a>
+<a class="g" data-c="arcade" href="pong.html"><div class="ic" style="background:linear-gradient(160deg,#63e6be,#12b886)"><svg viewBox="0 0 48 48"><rect x="8" y="12" width="5" height="18" rx="2.5" fill="#fff"/><rect x="35" y="20" width="5" height="18" rx="2.5" fill="#fff"/><circle cx="24" cy="24" r="3.5" fill="#fff"/></svg></div><div><div class="nm">Pong</div><div class="ds">First to seven</div></div></a>
+<a class="g" data-c="cards" href="blackjack.html"><div class="ic" style="background:linear-gradient(160deg,#2fb36d,#146a43)"><svg viewBox="0 0 48 48"><rect x="10" y="8" width="20" height="28" rx="4" fill="#fff" opacity=".6" transform="rotate(-12 20 22)"/><rect x="18" y="10" width="20" height="28" rx="4" fill="#fff" transform="rotate(8 28 24)"/><text x="28" y="31" font-size="16" font-weight="700" fill="#1c1c1e" text-anchor="middle" font-family="-apple-system,sans-serif" transform="rotate(8 28 24)">21</text></svg></div><div><div class="nm">Blackjack</div><div class="ds">Beat the dealer</div></div></a>
+<a class="g" data-c="cards" href="solitaire.html"><div class="ic" style="background:linear-gradient(160deg,#3fa56a,#1b6b45)"><svg viewBox="0 0 48 48"><rect x="9" y="8" width="30" height="32" rx="5" fill="#fff"/><text x="24" y="31" font-size="22" text-anchor="middle" fill="#e5271b" font-family="-apple-system,sans-serif">♥</text><text x="15" y="19" font-size="9" font-weight="700" fill="#e5271b" font-family="-apple-system,sans-serif">A</text></svg></div><div><div class="nm">Solitaire</div><div class="ds">Klondike</div></div></a>
+<a class="g" data-c="skill" href="word.html"><div class="ic" style="background:linear-gradient(160deg,#7bd88f,#2f9e57)"><svg viewBox="0 0 48 48"><rect x="6" y="14" width="10" height="10" rx="2.5" fill="#fff"/><rect x="19" y="14" width="10" height="10" rx="2.5" fill="#fff" opacity=".55"/><rect x="32" y="14" width="10" height="10" rx="2.5" fill="#fff"/><rect x="6" y="27" width="10" height="10" rx="2.5" fill="#fff" opacity=".55"/><rect x="19" y="27" width="10" height="10" rx="2.5" fill="#fff"/><rect x="32" y="27" width="10" height="10" rx="2.5" fill="#fff" opacity=".55"/></svg></div><div><div class="nm">Word</div><div class="ds">Guess in six</div></div></a>
+<a class="g" data-c="puzzle" href="slide.html"><div class="ic" style="background:linear-gradient(160deg,#ff9f6b,#ff6a3d)"><svg viewBox="0 0 48 48"><g fill="#fff"><rect x="8" y="8" width="14" height="14" rx="3.5"/><rect x="26" y="8" width="14" height="14" rx="3.5" opacity=".6"/><rect x="8" y="26" width="14" height="14" rx="3.5" opacity=".6"/><rect x="26" y="26" width="14" height="14" rx="3.5"/></g></svg></div><div><div class="nm">Slide</div><div class="ds">Sort the tiles</div></div></a>
+<a class="g" data-c="board" href="tictactoe.html"><div class="ic" style="background:linear-gradient(160deg,#5ac8fa,#0a84ff)"><svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"><path d="M18 8v32M30 8v32M8 18h32M8 30h32" opacity=".55"/><path d="M10 10l6 6M16 10l-6 6"/><circle cx="24" cy="24" r="4"/></svg></div><div><div class="nm">Tic-Tac-Toe</div><div class="ds">Unbeatable or easy</div></div></a>
+<a class="g" data-c="skill" href="simon.html"><div class="ic" style="background:linear-gradient(160deg,#ff8a8a,#e5352b)"><svg viewBox="0 0 48 48"><rect x="7" y="7" width="16" height="16" rx="6" fill="#fff"/><rect x="25" y="7" width="16" height="16" rx="6" fill="#fff" opacity=".5"/><rect x="7" y="25" width="16" height="16" rx="6" fill="#fff" opacity=".5"/><rect x="25" y="25" width="16" height="16" rx="6" fill="#fff"/></svg></div><div><div class="nm">Simon</div><div class="ds">Repeat the pattern</div></div></a>
+<a class="g" data-c="puzzle" href="lightsout.html"><div class="ic" style="background:linear-gradient(160deg,#ffe770,#ffb800)"><svg viewBox="0 0 48 48"><g fill="#fff"><circle cx="12" cy="12" r="5"/><circle cx="24" cy="12" r="5" opacity=".45"/><circle cx="36" cy="12" r="5"/><circle cx="12" cy="24" r="5" opacity=".45"/><circle cx="24" cy="24" r="5"/><circle cx="36" cy="24" r="5" opacity=".45"/><circle cx="12" cy="36" r="5"/><circle cx="24" cy="36" r="5" opacity=".45"/><circle cx="36" cy="36" r="5"/></g></svg></div><div><div class="nm">Lights Out</div><div class="ds">Turn them all off</div></div></a>
+<a class="g" data-c="arcade" href="invaders.html"><div class="ic" style="background:linear-gradient(160deg,#7a7aff,#3a3ad6)"><svg viewBox="0 0 48 48"><rect x="12" y="8" width="24" height="16" rx="6" fill="#fff"/><circle cx="19" cy="16" r="2.6" fill="#3a3ad6"/><circle cx="29" cy="16" r="2.6" fill="#3a3ad6"/><rect x="14" y="22" width="5" height="6" fill="#fff"/><rect x="29" y="22" width="5" height="6" fill="#fff"/><path d="M24 32l7 10H17z" fill="#fff" opacity=".8"/></svg></div><div><div class="nm">Invaders</div><div class="ds">Defend the base</div></div></a>
+<a class="g" data-c="arcade" href="asteroids.html"><div class="ic" style="background:linear-gradient(160deg,#4a4a52,#1c1c1e)"><svg viewBox="0 0 48 48" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"><path d="M10 14l8-5 9 3 8 8-3 9-9 3-10-6z" opacity=".7"/><path d="M30 44l-5-14 5 3 5-3z" transform="rotate(30 30 38)"/></svg></div><div><div class="nm">Asteroids</div><div class="ds">Blast the rocks</div></div></a>
+<a class="g" data-c="board" href="reversi.html"><div class="ic" style="background:linear-gradient(160deg,#2fb36d,#146a43)"><svg viewBox="0 0 48 48"><circle cx="17" cy="24" r="10" fill="#1c1c1e"/><circle cx="31" cy="24" r="10" fill="#fff"/></svg></div><div><div class="nm">Reversi</div><div class="ds">Flip the board</div></div></a>
+<a class="g" data-c="puzzle" href="code.html"><div class="ic" style="background:linear-gradient(160deg,#ffb36b,#ff7a1a)"><svg viewBox="0 0 48 48"><circle cx="12" cy="14" r="5" fill="#fff"/><circle cx="24" cy="14" r="5" fill="#fff" opacity=".55"/><circle cx="36" cy="14" r="5" fill="#fff"/><circle cx="12" cy="30" r="5" fill="#fff" opacity=".55"/><circle cx="24" cy="30" r="5" fill="#fff"/><circle cx="36" cy="30" r="5" fill="#fff" opacity=".55"/><circle cx="12" cy="42" r="2" fill="#fff"/><circle cx="18" cy="42" r="2" fill="#fff" opacity=".5"/></svg></div><div><div class="nm">Code</div><div class="ds">Crack the sequence</div></div></a>
+<a class="g" data-c="arcade" href="run.html"><div class="ic" style="background:linear-gradient(160deg,#8fd0ff,#2f8cf0)"><svg viewBox="0 0 48 48"><rect x="10" y="14" width="18" height="22" rx="6" fill="#fff"/><circle cx="23" cy="22" r="2.6" fill="#2f8cf0"/><rect x="32" y="26" width="6" height="14" rx="3" fill="#fff" opacity=".7"/><rect x="6" y="40" width="36" height="2.5" rx="1.2" fill="#fff" opacity=".6"/></svg></div><div><div class="nm">Run</div><div class="ds">Jump and duck</div></div></a>
+<a class="g" data-c="arcade" href="stack.html"><div class="ic" style="background:linear-gradient(160deg,#c58bff,#7b3cf0)"><svg viewBox="0 0 48 48"><rect x="12" y="32" width="24" height="7" rx="2.5" fill="#fff"/><rect x="14" y="24" width="22" height="7" rx="2.5" fill="#fff" opacity=".8"/><rect x="10" y="16" width="22" height="7" rx="2.5" fill="#fff" opacity=".6"/><rect x="18" y="8" width="20" height="7" rx="2.5" fill="#fff" opacity=".45"/></svg></div><div><div class="nm">Stack</div><div class="ds">Build the tower</div></div></a>
+<a class="g" data-c="skill" href="hangman.html"><div class="ic" style="background:linear-gradient(160deg,#9ea7ff,#5b63e8)"><svg viewBox="0 0 48 48"><path d="M10 42h22M16 42V8h20v7" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/><circle cx="36" cy="22" r="5" fill="none" stroke="#fff" stroke-width="3.5"/><path d="M36 28v8" stroke="#fff" stroke-width="3.5" stroke-linecap="round"/></svg></div><div><div class="nm">Hangman</div><div class="ds">Guess the word</div></div></a>
+<a class="g" data-c="arcade" href="whack.html"><div class="ic" style="background:linear-gradient(160deg,#8ddc7a,#3fa34d)"><svg viewBox="0 0 48 48"><ellipse cx="24" cy="36" rx="16" ry="6" fill="#2b1d12"/><path d="M12 36c0-12 4-20 12-20s12 8 12 20z" fill="#fff"/><circle cx="20" cy="27" r="2.2" fill="#2b1d12"/><circle cx="28" cy="27" r="2.2" fill="#2b1d12"/></svg></div><div><div class="nm">Whack</div><div class="ds">Hit the moles</div></div></a>
+<a class="g" data-c="puzzle" href="flood.html"><div class="ic" style="background:linear-gradient(160deg,#ff7ab6,#ff3b7f)"><svg viewBox="0 0 48 48"><rect x="8" y="8" width="16" height="16" rx="4" fill="#fff"/><rect x="26" y="8" width="14" height="16" rx="4" fill="#fff" opacity=".55"/><rect x="8" y="26" width="16" height="14" rx="4" fill="#fff" opacity=".55"/><rect x="26" y="26" width="14" height="14" rx="4" fill="#fff" opacity=".8"/></svg></div><div><div class="nm">Flood</div><div class="ds">Fill the board</div></div></a>
+<a class="g" data-c="puzzle" href="hanoi.html"><div class="ic" style="background:linear-gradient(160deg,#ffcf6b,#ff9f0a)"><svg viewBox="0 0 48 48"><rect x="22.5" y="8" width="3" height="32" rx="1.5" fill="#fff" opacity=".6"/><rect x="10" y="32" width="28" height="6" rx="3" fill="#fff"/><rect x="14" y="24" width="20" height="6" rx="3" fill="#fff" opacity=".8"/><rect x="18" y="16" width="12" height="6" rx="3" fill="#fff" opacity=".6"/></svg></div><div><div class="nm">Hanoi</div><div class="ds">Move the tower</div></div></a>
+<a class="g" data-c="puzzle" href="match.html"><div class="ic" style="background:linear-gradient(160deg,#ff9ad5,#c04bf0)"><svg viewBox="0 0 48 48"><circle cx="14" cy="14" r="6" fill="#fff"/><circle cx="34" cy="14" r="6" fill="#fff" opacity=".55"/><circle cx="24" cy="24" r="6" fill="#fff" opacity=".8"/><circle cx="14" cy="34" r="6" fill="#fff" opacity=".55"/><circle cx="34" cy="34" r="6" fill="#fff"/></svg></div><div><div class="nm">Match</div><div class="ds">Line up gems</div></div></a>
+<a class="g" data-c="skill" href="reaction.html"><div class="ic" style="background:linear-gradient(160deg,#ffb199,#ff4e50)"><svg viewBox="0 0 48 48"><path d="M27 6L12 27h10l-3 15 17-23H26z" fill="#fff"/></svg></div><div><div class="nm">Reaction</div><div class="ds">Test your reflexes</div></div></a>
+<a class="g" data-c="skill" href="type.html"><div class="ic" style="background:linear-gradient(160deg,#6fe3d0,#13a89e)"><svg viewBox="0 0 48 48"><rect x="6" y="14" width="36" height="22" rx="6" fill="#fff"/><g fill="#13a89e"><rect x="11" y="19" width="5" height="4" rx="1"/><rect x="19" y="19" width="5" height="4" rx="1"/><rect x="27" y="19" width="5" height="4" rx="1"/><rect x="11" y="27" width="26" height="4" rx="1"/></g></svg></div><div><div class="nm">Type</div><div class="ds">Words per minute</div></div></a>
+<a class="g" data-c="cards" href="hilo.html"><div class="ic" style="background:linear-gradient(160deg,#4fd1a5,#1a9e73)"><svg viewBox="0 0 48 48"><path d="M16 20l8-9 8 9z" fill="#fff"/><path d="M16 28l8 9 8-9z" fill="#fff" opacity=".55"/></svg></div><div><div class="nm">Hi-Lo</div><div class="ds">Higher or lower</div></div></a>
+<a class="g" data-c="cards" href="pig.html"><div class="ic" style="background:linear-gradient(160deg,#ffb8d0,#ff6f9c)"><svg viewBox="0 0 48 48"><rect x="9" y="9" width="30" height="30" rx="8" fill="#fff"/><circle cx="18" cy="18" r="3" fill="#ff6f9c"/><circle cx="30" cy="18" r="3" fill="#ff6f9c"/><circle cx="24" cy="24" r="3" fill="#ff6f9c"/><circle cx="18" cy="30" r="3" fill="#ff6f9c"/><circle cx="30" cy="30" r="3" fill="#ff6f9c"/></svg></div><div><div class="nm">Pig</div><div class="ds">Push your luck</div></div></a>
+<a class="g" data-c="board" href="fleet.html"><div class="ic" style="background:linear-gradient(160deg,#5fb4ff,#1a62c9)"><svg viewBox="0 0 48 48"><path d="M8 28h32l-5 9H13z" fill="#fff"/><rect x="21" y="14" width="3" height="14" fill="#fff"/><path d="M24 14l11 8H24z" fill="#fff" opacity=".7"/></svg></div><div><div class="nm">Fleet</div><div class="ds">Sink the ships</div></div></a>
+<a class="g" data-c="puzzle" href="maze.html"><div class="ic" style="background:linear-gradient(160deg,#b7c0ff,#6670e0)"><svg viewBox="0 0 48 48"><path d="M8 8h32v32H8zM8 16h16v16M32 8v16H16M40 32H24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/></svg></div><div><div class="nm">Maze</div><div class="ds">Find the way out</div></div></a>
+<a class="g" data-c="arcade" href="hop.html"><div class="ic" style="background:linear-gradient(160deg,#a0e86f,#4cb82e)"><svg viewBox="0 0 48 48"><rect x="10" y="38" width="28" height="5" rx="2.5" fill="#fff"/><rect x="16" y="12" width="16" height="20" rx="7" fill="#ffd60a"/><circle cx="21" cy="19" r="2.6" fill="#1c1c1e"/><circle cx="28" cy="19" r="2.6" fill="#1c1c1e"/></svg></div><div><div class="nm">Hop</div><div class="ds">Bounce upward</div></div></a>
+<a class="g" data-c="skill" href="math.html"><div class="ic" style="background:linear-gradient(160deg,#ffd36b,#f59f00)"><svg viewBox="0 0 48 48"><path d="M12 24h24M24 12v24" stroke="#fff" stroke-width="5" stroke-linecap="round"/></svg></div><div><div class="nm">Math</div><div class="ds">Quick sums</div></div></a>
+<a class="g" data-c="skill" href="color.html"><div class="ic" style="background:linear-gradient(160deg,#ff9d6b,#e0407a)"><svg viewBox="0 0 48 48"><circle cx="18" cy="20" r="9" fill="#fff" opacity=".85"/><circle cx="30" cy="20" r="9" fill="#fff" opacity=".55"/><circle cx="24" cy="30" r="9" fill="#fff" opacity=".7"/></svg></div><div><div class="nm">Color</div><div class="ds">Name the ink</div></div></a>
+<a class="g" data-c="puzzle" href="pegs.html"><div class="ic" style="background:linear-gradient(160deg,#d9a066,#9a6a38)"><svg viewBox="0 0 48 48"><g fill="#fff"><circle cx="24" cy="12" r="4.5"/><circle cx="14" cy="24" r="4.5"/><circle cx="34" cy="24" r="4.5" opacity=".5"/><circle cx="24" cy="24" r="4.5" opacity=".5"/><circle cx="24" cy="36" r="4.5"/></g></svg></div><div><div class="nm">Pegs</div><div class="ds">Leave just one</div></div></a>
+<a class="g" data-c="board" href="gomoku.html"><div class="ic" style="background:linear-gradient(160deg,#e8c487,#c58f3d)"><svg viewBox="0 0 48 48"><path d="M10 16h28M10 24h28M10 32h28M16 10v28M24 10v28M32 10v28" stroke="#fff" stroke-width="1.8" opacity=".6"/><circle cx="24" cy="24" r="5" fill="#1c1c1e"/><circle cx="32" cy="16" r="5" fill="#fff"/></svg></div><div><div class="nm">Gomoku</div><div class="ds">Five in a row</div></div></a>
+<a class="g" data-c="puzzle" href="push.html"><div class="ic" style="background:linear-gradient(160deg,#ffb454,#e07a10)"><svg viewBox="0 0 48 48"><rect x="9" y="14" width="18" height="18" rx="4" fill="#fff"/><path d="M13 14l10 18M23 14L13 32" stroke="#e07a10" stroke-width="2.5"/><circle cx="36" cy="30" r="5" fill="#fff" opacity=".7"/></svg></div><div><div class="nm">Push</div><div class="ds">Shove the crates</div></div></a>
+<a class="g" data-c="board" href="boxes.html"><div class="ic" style="background:linear-gradient(160deg,#7ad7f0,#2b9fd1)"><svg viewBox="0 0 48 48"><g fill="#fff"><circle cx="12" cy="12" r="3"/><circle cx="24" cy="12" r="3"/><circle cx="36" cy="12" r="3"/><circle cx="12" cy="24" r="3"/><circle cx="24" cy="24" r="3"/><circle cx="36" cy="24" r="3"/></g><path d="M12 12h12v12H12z" fill="#fff" opacity=".5"/><path d="M24 12h12M24 24h12" stroke="#fff" stroke-width="3"/></svg></div><div><div class="nm">Boxes</div><div class="ds">Claim the squares</div></div></a>
+<a class="g" data-c="puzzle" href="life.html"><div class="ic" style="background:linear-gradient(160deg,#7fe0a5,#2eaa63)"><svg viewBox="0 0 48 48"><g fill="#fff"><rect x="21" y="9" width="8" height="8" rx="2"/><rect x="31" y="19" width="8" height="8" rx="2"/><rect x="11" y="29" width="8" height="8" rx="2"/><rect x="21" y="29" width="8" height="8" rx="2"/><rect x="31" y="29" width="8" height="8" rx="2"/></g></svg></div><div><div class="nm">Life</div><div class="ds">Cellular sandbox</div></div></a>
+<a class="g" data-c="arcade" href="cross.html"><div class="ic" style="background:linear-gradient(160deg,#74d680,#2d9e45)"><svg viewBox="0 0 48 48"><rect x="8" y="30" width="32" height="8" rx="4" fill="#fff" opacity=".6"/><rect x="8" y="18" width="20" height="8" rx="4" fill="#fff" opacity=".6"/><rect x="18" y="8" width="12" height="8" rx="3" fill="#fff"/></svg></div><div><div class="nm">Cross</div><div class="ds">Road and river</div></div></a>
+</div>
+<div class="empty" id="empty" hidden><p>No games match these filters.</p><button class="btn sec" id="clear">Show all games</button></div>
+</div></div>
+<script src="controls.js"></script>
+<script>
+const grid = document.getElementById('grid');
+const chips = document.getElementById('chips');
+const search = document.getElementById('search');
+const cards = [...grid.querySelectorAll('a.g')];
+const href = card => card.getAttribute('href');
+const names = new Map(cards.map(card => [card, [
+  card.querySelector('.nm').textContent, card.querySelector('.ds').textContent
+].join(' ').toLowerCase()]));
+let recent = [], category = 'all', results = cards;
+try {
+  const stored = JSON.parse(localStorage.getItem('recentGames'));
+  if (Array.isArray(stored)) recent = stored.filter(url => cards.some(card => href(card) === url));
+  category = sessionStorage.getItem('gamesCategory') || 'all';
+  search.value = sessionStorage.getItem('gamesQuery') || '';
+} catch {}
+function filterGames() {
+  const query = search.value.trim().toLowerCase();
+  chips.querySelector('[data-f="recent"]').hidden = !recent.length;
+  if (![...chips.children].some(b => b.dataset.f === category && !b.hidden)) category = 'all';
+  for (const button of chips.children) {
+    const active = button.dataset.f === category;
+    button.classList.toggle('on', active);
+    button.setAttribute('aria-pressed', String(active));
+  }
+  document.getElementById('sectionTitle').textContent = query ? 'Search Results' :
+    [...chips.children].find(button => button.dataset.f === category).textContent;
+  const ordered = category === 'recent'
+    ? recent.map(url => cards.find(card => href(card) === url))
+    : cards;
+  results = ordered.filter(card => names.get(card).includes(query) &&
+    (category === 'all' || category === 'recent' || card.dataset.c === category));
+  for (const card of cards) card.hidden = !results.includes(card);
+  // Keep tab order and the visual order of the recently played games together.
+  grid.append(...ordered);
+  document.getElementById('empty').hidden = results.length > 0;
+  document.getElementById('count').textContent = results.length + (results.length === 1 ? ' game' : ' games');
+  try {
+    sessionStorage.setItem('gamesCategory', category);
+    sessionStorage.setItem('gamesQuery', search.value);
+  } catch {}
+}
+chips.addEventListener('click', event => {
+  const button = event.target.closest('button');
+  if (button) { category = button.dataset.f; filterGames(); }
+});
+search.addEventListener('input', filterGames);
+function showAllGames() {
+  category = 'all'; search.value = ''; filterGames(); search.focus();
+}
+document.getElementById('clear').onclick = showAllGames;
+grid.addEventListener('click', event => {
+  const card = event.target.closest('a.g');
+  if (!card) return;
+  recent = [href(card), ...recent.filter(url => url !== href(card))].slice(0, 8);
+  try { localStorage.setItem('recentGames', JSON.stringify(recent)); } catch {}
+});
+search.addEventListener('keydown', event => {
+  if (event.isComposing || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (event.key === 'Escape') {
+    event.preventDefault(); search.value = ''; filterGames();
+  } else if (results.length && (event.key === 'Enter' || event.key === 'ArrowDown')) {
+    event.preventDefault();
+    if (event.key === 'Enter') results[0].click();
+    else results[0].focus();
+  }
+});
+window.addEventListener('keydown', event => {
+  if (gameKey(event) === '/') {
+    event.preventDefault(); search.focus(); search.select();
+  }
+});
+enableGridNavigation(grid, 'a.g:not([hidden])');
+window.addEventListener('pageshow', filterGames);
+filterGames();
+</script></body></html>

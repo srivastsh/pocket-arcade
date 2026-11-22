@@ -1,0 +1,38 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cross</title><link rel="stylesheet" href="shared.css"><style>
+.board{position:relative;width:min(92vw,400px,calc((100vh - 230px)*.8182));aspect-ratio:9/11;border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;line-height:0;touch-action:none}canvas{width:100%;height:100%;display:block}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Cross</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="stats"><div class="stat"><small>Score</small><b id="score">0</b></div><div class="stat"><small>Lives</small><b id="lives">3</b></div><div class="stat"><small>Level</small><b id="lvl">1</b></div><div class="stat"><small>Best</small><b id="best">0</b></div></div>
+<div class="board" id="board"><canvas id="cv"></canvas><div class="overlay" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Cross</h2><p>Get across the road and river. Arrow keys, WASD, swipe or tap.</p><button class="btn">Play</button></div></div></div></main><script src="board-colors.js"></script><script src="controls.js"></script><script src="common.js"></script><script>
+const cv=$('cv'),ctx=cv.getContext('2d'),ov=$('ov'),CS=40,CO=9,RO=11,W=CS*CO,H=CS*RO,dpr=Math.min(devicePixelRatio||1,3);cv.width=W*dpr;cv.height=H*dpr;ctx.scale(dpr,dpr);
+let lanes,f,score,lives,lvl,maxr,state='idle',last=0,dead=0,best=+ls('bestCross')||0;
+const RIV=[1,2,3,4],ROAD=[6,7,8,9];
+function mkLane(r,k){const river=k==='r',sp=(river?[-48,64,-38,56]:[78,-98,58,-118])[(river?r-1:r-6)]*(1+(lvl-1)*.12),items=[];const wd=river?2.5*CS:CS*(Math.random()<.4?1.8:1.1);const L=Math.ceil((W+4*CS)/(river?3.3*CS:3*CS))*(river?3.3*CS:3*CS);const n=Math.round(L/(river?3.3*CS:3*CS));
+  for(let i=0;i<n;i++)items.push({x:i*L/n+rnd(20),w:river?(Math.random()<.5?2:3)*CS:wd,col:['red','orange','purple','teal','yellow'][rnd(5)]});return{r,k,v:sp,items,L}}
+function build(){lanes=[];RIV.forEach(r=>lanes.push(mkLane(r,'r')));ROAD.forEach(r=>lanes.push(mkLane(r,'c')))}
+function hud(){$('score').textContent=score;$('lives').textContent=lives;$('lvl').textContent=lvl;if(score>best){best=score;ls('bestCross',best)}$('best').textContent=best}
+function respawn(){f={x:4*CS,r:10};maxr=10}
+function full(){dead=0;score=0;lives=3;lvl=1;build();respawn();hud();state='run';ov.classList.add('hide')}
+function die(){if(dead>0)return;lives--;dead=.6;hud()}
+function hop(dr,dc){if(state!=='run'||dead>0)return;const nr=Math.max(0,Math.min(RO-1,f.r+dr));f.x=Math.max(0,Math.min(W-CS,f.x+dc*CS));f.r=nr;
+  if(nr<maxr){maxr=nr;score+=10;hud()}
+  if(nr===0){score+=100;lvl++;build();respawn();hud()}}
+function lane(r){return lanes.find(l=>l.r===r)}
+function upd(dt){for(const l of lanes)for(const it of l.items){it.x+=l.v*dt;if(it.x>W+2*CS)it.x-=l.L;if(it.x+it.w<-2*CS)it.x+=l.L}
+  if(dead>0){dead-=dt;if(dead<=0){if(lives<=0){state='over';overlay(ov,'Game Over','Score '+score,'Try Again',full)}else respawn()}return}
+  const l=lane(f.r);if(!l)return;const cx=f.x+CS/2;
+  if(l.k==='r'){const lg=l.items.find(it=>cx>it.x&&cx<it.x+it.w);if(!lg)return die();f.x+=l.v*dt;if(f.x<-CS*.4||f.x>W-CS*.6)die()}
+  else if(l.items.some(it=>f.x+8<it.x+it.w&&f.x+CS-8>it.x))die()}
+function bg(r){return RIV.includes(r)?boardColors.water:ROAD.includes(r)?boardColors.road:boardColors.grass}
+function draw(){for(let r=0;r<RO;r++){ctx.fillStyle=bg(r);ctx.fillRect(0,r*CS,W,CS)}
+  ctx.fillStyle='rgba(255,255,255,.35)';for(const r of[7,8,9])for(let x=0;x<W;x+=40){ctx.fillRect(x+8,r*CS-1,22,2)}
+  ctx.fillStyle=boardColors.green;for(let x=0;x<CO;x+=2){ctx.beginPath();ctx.roundRect(x*CS+6,6,CS-12,CS-12,10);ctx.fill()}
+  for(const l of lanes)for(const it of l.items){const y=l.r*CS;if(l.k==='r'){ctx.fillStyle=boardColors.wood;ctx.beginPath();ctx.roundRect(it.x,y+6,it.w,CS-12,12);ctx.fill();ctx.fillStyle='rgba(255,255,255,.2)';ctx.fillRect(it.x+10,y+12,it.w-20,3)}
+    else{ctx.fillStyle=boardColors[it.col];ctx.beginPath();ctx.roundRect(it.x,y+7,it.w,CS-14,8);ctx.fill();ctx.fillStyle='rgba(255,255,255,.55)';const fx=l.v>0?it.x+it.w-12:it.x+4;ctx.fillRect(fx,y+11,8,CS-22)}}
+  if(state!=='idle'){const x=f.x,y=f.r*CS;ctx.fillStyle=dead>0?boardColors.red:boardColors.green;ctx.beginPath();ctx.roundRect(x+7,y+7,CS-14,CS-14,10);ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#24563e';ctx.stroke();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x+14,y+13,4,0,7);ctx.arc(x+CS-14,y+13,4,0,7);ctx.fill();ctx.fillStyle='#1c1c1e';ctx.beginPath();ctx.arc(x+14,y+13,1.8,0,7);ctx.arc(x+CS-14,y+13,1.8,0,7);ctx.fill()}}
+function frame(t){const dt=Math.min((t-(last||t))/1000,.033);last=t;if(state==='run')upd(dt);draw();requestAnimationFrame(frame)}
+bindGameKeys({
+  ArrowUp: () => hop(-1, 0), ArrowDown: () => hop(1, 0),
+  ArrowLeft: () => hop(0, -1), ArrowRight: () => hop(0, 1),
+  ' ': event => { if (!event.repeat && state !== 'run') full(); }
+});
+let sx,sy;const bd=$('board');bd.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY});bd.addEventListener('pointercancel',()=>sx=null);bd.addEventListener('pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=null;if(Math.max(Math.abs(dx),Math.abs(dy))<18)return hop(-1,0);Math.abs(dx)>Math.abs(dy)?hop(0,dx<0?-1:1):hop(dy<0?-1:1,0)});
+ov.querySelector('button').onclick=full;$('newbtn').onclick=full;score=0;lives=3;lvl=1;build();f={x:4*CS,r:10};hud();requestAnimationFrame(frame);</script></body></html>

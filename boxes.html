@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Boxes</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;width:min(92vw,440px);padding:18px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow)}
+.g{display:grid;grid-template-columns:repeat(5,12px 1fr) 12px;grid-template-rows:repeat(5,12px 1fr) 12px;aspect-ratio:1}
+.d{border-radius:50%;background:var(--text)}
+.e{border:0;padding:0;background:var(--cell);border-radius:6px;cursor:pointer;transition:background .12s}
+.e:hover:not(.p1):not(.p2){background:rgba(10,132,255,.4)}
+.e.p1{background:var(--blue);cursor:default}.e.p2{background:var(--red);cursor:default}
+.bx{border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:20px;color:#fff}.bx.p1{background:rgba(10,132,255,.72)}.bx.p2{background:rgba(255,69,58,.72)}
+.msg{font-weight:600;min-height:24px}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Boxes</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="stats"><div class="stat"><small>You</small><b id="s1">0</b></div><div class="stat"><small>CPU</small><b id="s2">0</b></div></div>
+<div class="msg" id="msg"></div>
+<div class="wrap"><div class="g" id="g"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title"></h2><p></p><button class="btn">Play Again</button></div></div></div>
+<div class="hint">Draw lines between dots. Complete a box to claim it and go again.</div></main><script src="common.js"></script><script>
+const N=5;let E,O,turn,over,sc,cpuT;const gr=$('g'),ov=$('ov');
+const key=(t,r,c)=>t+r+'_'+c;
+function build(){gr.innerHTML='';gr.style.gridTemplateRows=`repeat(${N},12px 1fr) 12px`;
+  for(let i=0;i<=2*N;i++)for(let j=0;j<=2*N;j++){let e;if(i%2===0&&j%2===0){e=document.createElement('div');e.className='d'}
+    else if(i%2===0){e=document.createElement('button');e.className='e';e.dataset.k=key('h',i/2,(j-1)/2);e.setAttribute('aria-label','Line')}
+    else if(j%2===0){e=document.createElement('button');e.className='e';e.dataset.k=key('v',(i-1)/2,j/2);e.setAttribute('aria-label','Line')}
+    else{e=document.createElement('div');e.className='bx';e.dataset.k='b'+(i-1)/2+'_'+(j-1)/2}gr.append(e)}}
+const sides=(r,c)=>[key('h',r,c),key('h',r+1,c),key('v',r,c),key('v',r,c+1)];
+const cnt=(r,c)=>sides(r,c).filter(k=>E[k]).length;
+function adj(k){const t=k[0],[r,c]=k.slice(1).split('_').map(Number);const o=[];if(t==='h'){if(r>0)o.push([r-1,c]);if(r<N)o.push([r,c])}else{if(c>0)o.push([r,c-1]);if(c<N)o.push([r,c])}return o}
+function render(){gr.querySelectorAll('.e').forEach(e=>e.className='e'+(E[e.dataset.k]?' p'+E[e.dataset.k]:''));gr.querySelectorAll('.bx').forEach(e=>{const o=O[e.dataset.k];e.className='bx'+(o?' p'+o:'');e.textContent=o?(o===1?'Y':'C'):''});$('s1').textContent=sc[0];$('s2').textContent=sc[1];
+  $('msg').textContent=over?'':turn===1?'Your turn':'CPU is playing'}
+function reset(){clearTimeout(cpuT);E={};O={};sc=[0,0];turn=1;over=false;ov.classList.add('hide');build();render()}
+function draw(k,p){E[k]=p;let got=0;for(const[r,c]of adj(k)){const bk='b'+r+'_'+c;if(!O[bk]&&cnt(r,c)===4){O[bk]=p;sc[p-1]++;got++}}
+  if(sc[0]+sc[1]===N*N){over=true;render();overlay(ov,sc[0]>sc[1]?'You win':sc[0]<sc[1]?'CPU wins':'Draw',`${sc[0]} to ${sc[1]}`,'Play Again',reset);return}
+  if(!got)turn=3-turn;render();if(turn===2)cpuT=setTimeout(cpu,500)}
+function cpu(){if(over||turn!==2)return;const all=[];for(let r=0;r<=N;r++)for(let c=0;c<N;c++){all.push(key('h',r,c));all.push(key('v',c,r))}const free=all.filter(k=>!E[k]);
+  const take=free.filter(k=>adj(k).some(([r,c])=>cnt(r,c)===3));const safe=free.filter(k=>adj(k).every(([r,c])=>cnt(r,c)<2));
+  const pool=take.length?take:safe.length?safe:(()=>{let best=99,o=[];for(const k of free){const w=adj(k).reduce((a,[r,c])=>a+(cnt(r,c)===2?1:0),0);if(w<best){best=w;o=[k]}else if(w===best)o.push(k)}return o})();draw(pool[rnd(pool.length)],2)}
+gr.addEventListener('click',e=>{const b=e.target.closest('.e');if(!b||over||turn!==1||E[b.dataset.k])return;draw(b.dataset.k,1)});
+$('newbtn').onclick=reset;reset();</script></body></html>

@@ -1,0 +1,60 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Word</title><link rel="stylesheet" href="shared.css">
+<style>
+:root{--absent:#8e8e93}@media(prefers-color-scheme:dark){:root{--absent:#48484a}}
+.rows{display:grid;gap:6px;width:min(80vw,320px)}
+.r{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.t{aspect-ratio:1;display:grid;place-items:center;border-radius:10px;border:2px solid var(--line);background:var(--card);font-size:clamp(24px,7vw,32px);font-weight:700;text-transform:uppercase;transition:border-color .1s}
+.t.f{border-color:var(--sub);animation:pop .1s}
+.t.g,.t.y,.t.x{color:#fff;border-color:transparent}
+.t.g{background:var(--green)}.t.y{background:#c99a00}.t.x{background:var(--absent)}
+.t.flip{animation:flip .5s ease-in-out}
+.r.shake{animation:shake .4s}
+@keyframes pop{50%{transform:scale(1.1)}}
+@keyframes flip{50%{transform:scaleY(0)}}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.kb{display:grid;gap:6px;width:min(94vw,480px)}
+.kr{display:flex;gap:5px;justify-content:center}
+.k{flex:1;max-width:44px;height:52px;border:0;border-radius:8px;background:var(--cell);color:var(--text);font-size:15px;font-weight:600;text-transform:uppercase;cursor:pointer}
+.k.w{max-width:66px;font-size:12px}
+.k:active{transform:scale(.94)}
+.k.g{background:var(--green);color:#fff}.k.y{background:#c99a00;color:#fff}.k.x{background:var(--absent);color:#fff}
+.toast{position:fixed;top:78px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:12px;background:var(--text);color:var(--bg);font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none;z-index:20}
+.toast.on{opacity:1}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Word</h1><div class="right"><button class="btn sec" id="newbtn">New Word</button></div></header>
+<main>
+<div class="stats"><div class="stat"><small>Played</small><b id="pl">0</b></div><div class="stat"><small>Won</small><b id="wn">0</b></div><div class="stat"><small>Streak</small><b id="st">0</b></div></div>
+<div class="rows" id="rows"></div>
+<div class="kb" id="kb"></div>
+</main><div class="toast" id="toast"></div>
+<script>
+const WORDS="about above abuse actor adapt admit adopt adult after again agent agree ahead alarm album alert alike alive allow alone along alter among anger angle angry apart apple apply arena argue arise array aside asset audio avoid awake award aware badly baker basic basis beach began begin being below bench birth black blame blind block blood board boost booth bound brain brand bread break breed brief bring broad broke brown build built buyer cable carry catch cause chain chair chart chase cheap check chest chief child chose civil claim class clean clear click climb clock close cloud coach coast could count court cover craft crash cream crime cross crowd crown curve cycle daily dance dealt death debut delay depth doubt dozen draft drama drawn dream dress drill drink drive drove dying eager early earth eight elite empty enemy enjoy enter entry equal error event every exact exist extra faith false fault fiber field fifth fifty fight final first fixed flash fleet floor focus force forth forty forum found frame frank fraud fresh front fruit fully giant glass globe going grace grade grand grant grass great green gross group grown guard guess guest guide happy heart heavy hence horse hotel house human ideal image index inner input issue joint judge known label large laser later laugh layer learn lease least leave legal level light limit local logic loose lower lucky lunch lying magic major maker march match maybe mayor meant media metal might minor minus mixed model money month moral motor mount mouse mouth movie music never newly night noise north novel nurse occur ocean offer often order other ought paint panel paper party peace phase phone photo piece pilot pitch place plain plane plant plate point pound power press price pride prime print prior prize proof proud prove queen quick quiet quite radio raise range rapid ratio reach ready refer right rival river robot rough round route royal rural scale scene scope score sense serve seven shall shape share sharp sheet shelf shell shift shirt shock shoot short shown sight since sixth sixty skill sleep slide small smart smile smoke solid solve sorry sound south space spare speak speed spend spent split spoke sport staff stage stake stand start state steam steel stick still stock stone stood store storm story strip stuck study stuff style sugar suite super sweet table taken taste teach thank theme there these thick thing think third those three threw throw tight title today topic total touch tough tower track trade train treat trend trial tried truck truly trust truth twice under union unity until upper upset urban usage usual valid value video virus visit vital voice waste watch water wheel where which while white whole whose woman world worry worse worst worth would write wrong wrote yield young youth".split(' ');
+const $=id=>document.getElementById(id);
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+let S={p:0,w:0,s:0},ans,row,col,done,busy,ks={},gid=0;try{S=Object.assign(S,JSON.parse(ls('wordStats')||'{}'))}catch(e){}
+const rows=$('rows'),kb=$('kb');
+for(let r=0;r<6;r++){const d=document.createElement('div');d.className='r';for(let c=0;c<5;c++)d.append(Object.assign(document.createElement('div'),{className:'t'}));rows.append(d)}
+['qwertyuiop','asdfghjkl','+zxcvbnm-'].forEach(s=>{const d=document.createElement('div');d.className='kr';for(const ch of s){const b=document.createElement('button');b.className='k'+(ch==='+'||ch==='-'?' w':'');b.dataset.k=ch==='+'?'Enter':ch==='-'?'Backspace':ch;b.textContent=ch==='+'?'Enter':ch==='-'?'⌫':ch;if(ch==='-')b.setAttribute('aria-label','Delete');d.append(b)}kb.append(d)});
+function stats(){$('pl').textContent=S.p;$('wn').textContent=S.w;$('st').textContent=S.s;ls('wordStats',JSON.stringify(S))}
+function reset(){gid++;ans=WORDS[Math.random()*WORDS.length|0];row=col=0;done=busy=false;ks={};document.querySelectorAll('.t').forEach(t=>{t.className='t';t.textContent=''});document.querySelectorAll('.k').forEach(k=>k.classList.remove('g','y','x'));stats()}
+function toast(m,ms=1400){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),ms)}
+function tile(r,c){return rows.children[r].children[c]}
+function key(k){if(done||busy)return;
+  if(/^[a-z]$/i.test(k)){if(col<5){const t=tile(row,col++);t.textContent=k;t.classList.add('f')}}
+  else if(k==='Backspace'){if(col>0){const t=tile(row,--col);t.textContent='';t.classList.remove('f')}}
+  else if(k==='Enter')submit()}
+function submit(){
+  if(col<5){const r=rows.children[row];r.classList.remove('shake');void r.offsetWidth;r.classList.add('shake');return toast('Not enough letters')}
+  const g=[...rows.children[row].children].map(t=>t.textContent.toLowerCase()),res=Array(5).fill('x'),cnt={};
+  for(let i=0;i<5;i++){if(g[i]===ans[i])res[i]='g';else cnt[ans[i]]=(cnt[ans[i]]||0)+1}
+  for(let i=0;i<5;i++)if(res[i]!=='g'&&cnt[g[i]]>0){res[i]='y';cnt[g[i]]--}
+  busy=true;const r=row,id=gid;
+  g.forEach((ch,i)=>setTimeout(()=>{if(id!==gid)return;const t=tile(r,i);t.classList.add('flip');setTimeout(()=>{if(id!==gid)return;t.classList.remove('f');t.classList.add(res[i]);const k=document.querySelector(`.k[data-k="${ch}"]`),rank={x:1,y:2,g:3};if((ks[ch]||0)<rank[res[i]]){ks[ch]=rank[res[i]];k.classList.remove('g','y','x');k.classList.add(res[i])}},250)},i*260));
+  setTimeout(()=>{if(id!==gid)return;busy=false;
+    if(g.join('')===ans){done=true;S.p++;S.w++;S.s++;stats();toast(['Genius','Magnificent','Impressive','Splendid','Great','Phew'][r],2500)}
+    else if(r===5){done=true;S.p++;S.s=0;stats();toast(ans.toUpperCase(),4000)}},5*260+300);
+  row++;col=0}
+addEventListener('keydown',e=>{if(e.metaKey||e.ctrlKey||e.altKey)return;if(e.key==='Enter'||e.key==='Backspace'||/^[a-z]$/i.test(e.key)){e.preventDefault();key(e.key)}});
+kb.addEventListener('click',e=>{const b=e.target.closest('.k');if(b)key(b.dataset.k)});
+$('newbtn').onclick=()=>{if(!done&&row>0){S.s=0;S.p++}reset()};reset();
+</script></body></html>

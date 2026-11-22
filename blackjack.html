@@ -1,0 +1,64 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Blackjack</title><link rel="stylesheet" href="shared.css"><link rel="stylesheet" href="cards.css">
+<style>
+.table{--cw:clamp(58px,17vw,86px);width:min(94vw,560px);padding:22px 18px;border-radius:var(--r);background:var(--felt);box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.2);display:flex;flex-direction:column;align-items:center;gap:10px;color:#fff}
+.lab{font-size:13px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;opacity:.85}
+.lab b{display:inline-block;margin-left:6px;padding:1px 9px;border-radius:99px;background:rgba(0,0,0,.28);font-size:13px;letter-spacing:0}
+.hand{display:flex;justify-content:center;min-height:calc(var(--cw)*1.4)}
+.hand .card+.card{margin-left:calc(var(--cw)*-.4)}
+.card.deal{animation:deal .3s cubic-bezier(.2,.8,.2,1)}
+@keyframes deal{from{transform:translate(40px,-60px) rotate(8deg);opacity:0}}
+.msg{min-height:34px;font-size:24px;font-weight:700;letter-spacing:-.01em;text-align:center}
+.ctrl{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;min-height:56px}
+.chip{width:56px;height:56px;border-radius:50%;border:4px dashed rgba(255,255,255,.75);font-size:15px;font-weight:700;color:#fff;cursor:pointer;box-shadow:0 3px 8px rgba(0,0,0,.25);transition:transform .1s}
+.chip:active{transform:scale(.92)}.chip:disabled{opacity:.3}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Blackjack</h1><div class="right"><button class="btn sec" id="newbtn">Reset Chips</button></div></header>
+<main>
+<div class="stats"><div class="stat"><small>Chips</small><b id="bank">1000</b></div><div class="stat"><small>Bet</small><b id="bet">0</b></div></div>
+<div class="table">
+<div class="lab">Dealer<b id="dt" hidden></b></div><div class="hand" id="dh"></div>
+<div class="msg" id="msg">Place your bet</div>
+<div class="hand" id="ph"></div><div class="lab">You<b id="pt" hidden></b></div>
+</div>
+<div class="ctrl" id="ctrl"></div>
+<div class="hint">Blackjack pays 3 to 2. Dealer stands on all 17s.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+const SU=['♠','♥','♦','♣'],RK=['','A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+let shoe=[],pl=[],dl=[],bank=ls('bjBank')===null||ls('bjBank')===undefined?1000:+ls('bjBank'),bet=0,lastBet=25,phase='bet',uid=0,rid=0;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function newShoe(){shoe=[];for(let d=0;d<6;d++)for(let s=0;s<4;s++)for(let r=1;r<=13;r++)shoe.push({s,r});for(let i=shoe.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[shoe[i],shoe[j]]=[shoe[j],shoe[i]]}}
+function draw(){if(shoe.length<52)newShoe();const c=shoe.pop();c.id=++uid;return c}
+function val(h){let t=0,a=0;for(const c of h){t+=c.r>10?10:c.r===1?11:c.r;if(c.r===1)a++}while(t>21&&a){t-=10;a--}return t}
+function mk(c,down){const e=document.createElement('div');e.className='card'+(c.s===1||c.s===2?' red':'')+(down?' down':'');e.innerHTML=`<span class="tl">${RK[c.r]}<br>${SU[c.s]}</span><span class="ct">${SU[c.s]}</span>`;return e}
+function showHand(el,h,hide){while(el.children.length>h.length)el.lastChild.remove();h.forEach((c,i)=>{const face=hide&&i===1?'d':'u',e=el.children[i];if(!e||e.dataset.f!==face||e.dataset.id!=c.id){const n=mk(c,face==='d');n.dataset.f=face;n.dataset.id=c.id;n.classList.add('deal');e?e.replaceWith(n):el.append(n)}})}
+function save(){ls('bjBank',bank)}
+function render(){
+  $('bank').textContent=bank;$('bet').textContent=bet;
+  const hide=phase==='play'||phase==='deal';showHand($('dh'),dl,hide);showHand($('ph'),pl,false);
+  $('dt').hidden=!dl.length||hide;$('dt').textContent=dl.length?val(dl):'';$('pt').hidden=!pl.length;$('pt').textContent=pl.length?val(pl):'';
+  const c=$('ctrl');c.innerHTML='';
+  const add=(t,f,cls,dis)=>{const b=document.createElement('button');b.className='btn '+(cls||'');b.textContent=t;b.disabled=!!dis;b.onclick=f;c.append(b);return b};
+  if(phase==='bet'){
+    for(const v of[10,25,100,500]){const b=document.createElement('button');b.className='chip';b.textContent=v;b.setAttribute('aria-label','Bet '+v);b.style.background={10:'#0a84ff',25:'#30d158',100:'#1c1c1e',500:'#bf5af2'}[v];b.disabled=bet+v>bank;b.onclick=()=>{bet+=v;render()};c.append(b)}
+    add('Clear',()=>{bet=0;render()},'sec',!bet);add('Deal',deal,'',!bet)}
+  else if(phase==='play'){add('Hit',hit);add('Stand',stand,'sec');add('Double',dbl,'sec',pl.length!==2||bank<bet)}
+  else if(phase==='done'){
+    if(bank<10){add('Out of chips. Reset',()=>{bank=1000;save();next()})}else add('Next Hand',next)}}
+function next(){rid++;bet=Math.min(lastBet,bank);if(bet<10)bet=0;pl=[];dl=[];phase='bet';$('msg').textContent='Place your bet';render()}
+async function deal(){if(!bet||phase!=='bet')return;const id=rid;lastBet=bet;bank-=bet;save();phase='deal';pl=[];dl=[];$('msg').textContent='';
+  for(const t of[pl,dl,pl,dl]){t.push(draw());render();await sleep(260);if(id!==rid)return}
+  const p=val(pl),d=val(dl);
+  if(p===21||d===21){phase='dealer';render();await sleep(500);if(id!==rid)return;return finish(p===21&&d===21?'push':p===21?'bj':'lose')}
+  phase='play';render()}
+function hit(){if(phase!=='play')return;pl.push(draw());const v=val(pl);if(v>21){phase='dealer';render();const id=rid;return setTimeout(()=>{if(id===rid)finish('bust')},400)}if(v===21)return stand();render()}
+function dbl(){if(phase!=='play'||pl.length!==2||bank<bet)return;bank-=bet;bet*=2;save();pl.push(draw());if(val(pl)>21){phase='dealer';render();const id=rid;return setTimeout(()=>{if(id===rid)finish('bust')},400)}stand()}
+async function stand(){if(phase!=='play')return;const id=rid;phase='dealer';render();await sleep(550);if(id!==rid)return;while(val(dl)<17){dl.push(draw());render();await sleep(650);if(id!==rid)return}
+  const p=val(pl),d=val(dl);finish(d>21?'win':p>d?'win':p<d?'lose':'push')}
+function finish(r){phase='done';const M={bj:['Blackjack',2.5],win:['You win',2],push:['Push',1],lose:['Dealer wins',0],bust:['Bust',0]}[r];
+  bank+=Math.round(bet*M[1]);save();$('msg').textContent=M[0]+(M[1]>1?` +${Math.round(bet*(M[1]-1))}`:'');render()}
+$('newbtn').onclick=()=>{bank=1000;save();next()};
+newShoe();bet=Math.min(25,bank);if(bank<10){bank=1000;bet=25}render();
+</script></body></html>

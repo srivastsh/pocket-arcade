@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reaction</title><link rel="stylesheet" href="shared.css"><style>
+.pad{width:min(92vw,640px);height:min(52vh,380px);border-radius:var(--r);display:grid;place-items:center;text-align:center;color:#fff;background:var(--blue);cursor:pointer;box-shadow:var(--shadow);transition:background .12s}
+.pad h2{margin:0;font-size:40px;letter-spacing:-.02em}.pad p{margin:8px 0 0;opacity:.85}
+.pad.wait{background:var(--red)}.pad.go{background:var(--green)}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Reaction</h1><div class="right"><button class="btn sec" id="newbtn">Reset</button></div></header><main>
+<div class="stats"><div class="stat"><small>Round</small><b id="rd">0/5</b></div><div class="stat"><small>Last</small><b id="last">-</b></div><div class="stat"><small>Average</small><b id="avg">-</b></div><div class="stat"><small>Best</small><b id="best">-</b></div></div>
+<div class="pad" id="pad"><div><h2 id="t">Click to start</h2><p id="s">Wait for green, then click as fast as you can</p></div></div></main><script src="common.js"></script><script>
+let st='idle',t0,to,times=[],best=+ls('bestReact')||0;const pad=$('pad');
+function ui(){$('rd').textContent=times.length+'/5';$('best').textContent=best?best+' ms':'-';$('avg').textContent=times.length?Math.round(times.reduce((a,b)=>a+b)/times.length)+' ms':'-'}
+function set(c,t,s){pad.className='pad '+c;$('t').textContent=t;$('s').textContent=s}
+function wait(){st='wait';set('wait','Wait','Click when it turns green');to=setTimeout(()=>{st='go';t0=performance.now();set('go','Click now','')},1200+Math.random()*2800)}
+function click(){
+  if(st==='idle'){times=[];$('last').textContent='-';ui();wait()}
+  else if(st==='wait'){clearTimeout(to);st='next';set('','Too soon','Click to try this round again')}
+  else if(st==='go'){const ms=Math.round(performance.now()-t0);times.push(ms);$('last').textContent=ms+' ms';ui();
+    if(times.length>=5){st='idle';const a=Math.round(times.reduce((x,y)=>x+y)/5);if(!best||a<best){best=a;ls('bestReact',best)}ui();set('','Average '+a+' ms','Click to play again');times=[]}
+    else{st='next';set('',ms+' ms','Click for the next round')}}
+  else if(st==='next')wait()}
+pad.addEventListener('pointerdown',e=>{if(e.button>0)return;e.preventDefault();click()});addEventListener('keydown',e=>{if(e.key===' '&&!e.repeat){e.preventDefault();click()}});
+$('newbtn').onclick=()=>{clearTimeout(to);st='idle';times=[];ui();set('','Click to start','Wait for green, then click as fast as you can')};ui();</script></body></html>

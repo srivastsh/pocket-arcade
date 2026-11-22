@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rally</title><link rel="stylesheet" href="shared.css">
+<style>
+.circuit { position:relative; width:min(94vw,820px); aspect-ratio:780/470; overflow:hidden; border-radius:var(--r); background:var(--grass); box-shadow:var(--shadow) }
+.circuit canvas { display:block; width:100%; height:100% }
+.courses { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; width:min(94vw,820px); padding:6px; border-radius:19px; background:var(--panel); box-shadow:var(--glass-shadow); -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }
+.courses button { display:flex; align-items:center; justify-content:center; gap:7px; padding:7px; border:0; border-radius:13px; background:transparent; color:var(--sub); font-size:13px; font-weight:580; line-height:1.2; cursor:pointer; }
+.courses button[aria-pressed="true"] { color:var(--accent-text); background:var(--solid); box-shadow:var(--button-shadow); }
+.courses button:hover { background:var(--control); }
+.courses canvas { flex:none; width:48px; height:29px; }
+@media (max-width:680px) { .courses { grid-template-columns:repeat(2,minmax(0,1fr)); } .courses button { justify-content:flex-start; } }
+@media (prefers-reduced-transparency:reduce) { .courses { background:var(--card); backdrop-filter:none; } }
+.stats .stat { min-width:90px; }
+.pedals { display:none; gap:8px; width:min(94vw,560px); }
+.pedals .btn { min-height:44px; flex:1; touch-action:none; }
+.pedals .btn.held { background:var(--blue); color:white; }
+@media (any-pointer:coarse) { .pedals { display:flex; } }
+@media (max-width:440px) { .stats .stat { min-width:80px; } }
+</style></head>
+<body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Rally</h1><div class="right"><button class="btn sec" id="newbtn">Restart Lap</button></div></header>
+<main>
+<div class="courses" role="group" aria-label="Rally courses" id="courses"></div>
+<div class="stats"><div class="stat"><small>Lap time</small><b id="time">0:00.00</b></div><div class="stat"><small>Best lap</small><b id="best">—</b></div><div class="stat"><small>Gates</small><b id="gates">0 / 5</b></div></div>
+<div class="circuit"><canvas id="track" aria-label="Rally circuit. Drive through the highlighted gates in order."></canvas>
+<div class="overlay" id="ov"><div class="game-sheet" role="group" aria-labelledby="ovt"><h2 id="ovt">Rally</h2><p>Follow the arrows through five gates. Race your fastest lap’s ghost on your next run.</p><button class="btn" id="play">Start Lap</button></div></div></div>
+<div class="pedals" id="pedals"><button class="btn sec" data-key="ArrowLeft" aria-label="Steer left">←</button><button class="btn sec" data-key="ArrowRight" aria-label="Steer right">→</button><button class="btn sec" data-key="ArrowDown">Brake</button><button class="btn" data-key="ArrowUp">Gas</button></div>
+<p class="hint">W accelerates, S brakes or reverses, and A/D steer. Arrow keys also work. Press P to pause.</p>
+</main>
+<script src="common.js"></script><script src="controls.js"></script><script src="board-colors.js"></script>
+<script src="rally-courses.js"></script><script src="rally-scenery.js"></script>
+<script>
+const width = 780, height = 470, samplesPerNode = 12;
+function sampleTrack(nodes) {
+  const points = [];
+  for (let i = 0; i < nodes.length; i++) {
+    const controls = [-1,0,1,2].map(offset => nodes[(i + offset + nodes.length) % nodes.length]);
+    for (let j = 0; j < samplesPerNode; j++) {
+      const t = j / samplesPerNode;
+      points.push([0,1].map(axis => {
+        const [a,b,c,d] = controls.map(node => node[axis]);
+        return .5 * (2*b + (-a+c)*t + (2*a-5*b+4*c-d)*t*t + (-a+3*b-3*c+d)*t*t*t);
+      }));
+    }
+  }
+  return points;
+}
+const courseTracks = new Map(rallyCourses.map(course => [course.id, sampleTrack(course.nodes)]));
+let currentCourse, track, roadRadius, segments, gates, finish, saveKey;
+function selectCourse(id) {
+  const course = rallyCourses.find(item => item.id === id) || rallyCourses[0];
+  if (currentCourse === course) return;
+  currentCourse = course;
+  roadRadius = course.roadRadius;
+  track = courseTracks.get(course.id);
+  segments = track.map(([x,y], index) => {
+    const [nx,ny] = track[(index+1) % track.length];
+    const dx = nx-x, dy = ny-y, len = Math.hypot(dx,dy);
+    return {x,y,dx,dy,len,tx:dx/len,ty:dy/len};
+  });
+  finish = segments[0];
+  gates = [...course.gateNodes.map(index => segments[index*samplesPerNode]), finish];
+  saveKey = course.id === 'harbor' ? 'rallyHarborCircuitV1' : 'rallyGhostV1.' + course.id;
+  ghost = loadGhost();
+  ls('rallySelectedCourseV1', course.id);
+  for (const button of $('courses').children) button.setAttribute('aria-pressed', String(button.dataset.course === course.id));
+  canvas.setAttribute('aria-label', course.name + '. Drive through the highlighted gates in order.');
+  prepareCourse();
+  reset();
+}
+function buildCoursePicker() {
+  for (const course of rallyCourses) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.dataset.course = course.id;
+    button.addEventListener('click', () => selectCourse(course.id));
+    const preview = document.createElement('canvas');
+    preview.setAttribute('aria-hidden','true');
+    preview.width = 144; preview.height = 87;
+    const pen = preview.getContext('2d');
+    pen.scale(preview.width/width,preview.height/height);
+    pen.lineWidth = 25; pen.lineJoin = 'round'; pen.strokeStyle = '#8796a9';
+    pen.beginPath();
+    courseTracks.get(course.id).forEach(([x,y],i) => i ? pen.lineTo(x,y) : pen.moveTo(x,y));
+    pen.closePath(); pen.stroke();
+    button.append(preview, document.createTextNode(course.name));
+    $('courses').append(button);
+  }
+}
+function nearest(x, y) {
+  let dist2 = Infinity, px, py;
+  for (const seg of segments) {
+    const u = Math.max(0, Math.min(1, ((x-seg.x)*seg.tx + (y-seg.y)*seg.ty) / seg.len));
+    const nx = seg.x + u*seg.dx, ny = seg.y + u*seg.dy;
+    const d = (x-nx)**2 + (y-ny)**2;
+    if (d < dist2) { dist2 = d; px = nx; py = ny; }
+  }
+  return {x:px, y:py, distance:Math.sqrt(dist2)};
+}
+function crossed(gate, oldX, oldY, x, y) {
+  const from = (oldX-gate.x)*gate.tx + (oldY-gate.y)*gate.ty;
+  const to = (x-gate.x)*gate.tx + (y-gate.y)*gate.ty;
+  if (from >= 0 || to < 0) return false;
+  const ratio = -from/(to-from);
+  const side = -(oldX + (x-oldX)*ratio - gate.x)*gate.ty + (oldY + (y-oldY)*ratio - gate.y)*gate.tx;
+  return Math.abs(side) <= roadRadius + 7;
+}
+function loadGhost() {
+  try {
+    const data = JSON.parse(ls(saveKey));
+    if (!data || !Number.isFinite(data.time) || data.time <= 0 || !Array.isArray(data.frames) ||
+        data.frames.length < 2 || data.frames.length > 2002) return null;
+    let previous = -1;
+    for (const frame of data.frames) {
+      if (!Array.isArray(frame) || frame.length !== 4 || !frame.every(Number.isFinite)) return null;
+      const [t,x,y] = frame;
+      if (t <= previous || t > data.time || x<0 || x>width || y<0 || y>height) return null;
+      previous = t;
+    }
+    if (data.frames[0][0] !== 0 || previous !== data.time) return null;
+    return data;
+  } catch { return null; }
+}
+const canvas = $('track'), ctx = canvas.getContext('2d');
+let courseImage;
+let mode = 'ready', car, nextGate, elapsed, previousTime, recording, interval, ghost;
+let request = 0;
+const touches = new Map();
+function formatTime(t) {
+  const hundredths = Math.floor(t*100 + .00001);
+  return Math.floor(hundredths/6000) + ':' + String(Math.floor(hundredths/100)%60).padStart(2,'0') + '.' + String(hundredths%100).padStart(2,'0');
+}
+function refreshStats() {
+  $('time').textContent = formatTime(elapsed);
+  $('best').textContent = ghost ? formatTime(ghost.time) : '—';
+  $('gates').textContent = Math.min(currentCourse.gateNodes.length,nextGate) + ' / ' + currentCourse.gateNodes.length;
+}
+function sample() {
+  // Compact snapshots retain centisecond timing and subpixel positions.
+  return [elapsed, +car.x.toFixed(1), +car.y.toFixed(1), +car.heading.toFixed(3)];
+}
+function reset() {
+  if (request) cancelAnimationFrame(request);
+  request = 0;
+  car = {x:finish.x,y:finish.y,heading:Math.atan2(finish.ty,finish.tx),speed:0};
+  mode = 'ready'; nextGate = 0; elapsed = 0; interval = .1; recording = [sample()];
+  clearTouches(); refreshStats(); draw();
+  overlay($('ov'),currentCourse.name,currentCourse.description + ' Clear ' + currentCourse.gateNodes.length + ' gates and cross the checkered line.','Start Lap',drive);
+}
+function drive() {
+  if (mode === 'racing') return;
+  mode = 'racing'; previousTime = performance.now();
+  $('ov').classList.add('hide'); request = requestAnimationFrame(frame);
+}
+function pause() {
+  if (mode !== 'racing') return;
+  mode = 'paused'; clearTouches(); cancelAnimationFrame(request); request = 0;
+  overlay($('ov'),'Paused','Your lap clock is paused.','Resume',drive);
+}
+function complete() {
+  mode = 'finished';
+  const record = !ghost || elapsed < ghost.time;
+  if (record) {
+    if (recording.at(-1)[0] !== elapsed) recording.push(sample());
+    ghost = {time:elapsed,frames:recording}; ls(saveKey,JSON.stringify(ghost));
+  }
+  refreshStats();
+  overlay($('ov'),record ? 'New best lap' : 'Lap complete', formatTime(elapsed) + (record ? ' · Ghost saved' : ' · Best ' + formatTime(ghost.time)), 'Race Again', () => { reset(); drive(); });
+}
+function advance(dt, gas, brake, steering) {
+  const previousX = car.x, previousY = car.y;
+  if (gas || brake) car.speed += (gas ? (car.speed<0 ? 245 : 130) : (car.speed>0 ? -250 : -75))*dt;
+  else car.speed = Math.sign(car.speed)*Math.max(0,Math.abs(car.speed)-45*dt);
+  car.speed = Math.max(-68,Math.min(239,car.speed));
+  car.heading += steering * Math.sign(car.speed) * Math.min(1,Math.abs(car.speed)/52) * 2.7 * dt;
+  car.x += Math.cos(car.heading)*car.speed*dt;
+  car.y += Math.sin(car.heading)*car.speed*dt;
+  const road = nearest(car.x,car.y);
+  if (road.distance > roadRadius-1) {
+    car.speed *= Math.exp(-2*dt);
+    const limit = roadRadius + 7;
+    if (road.distance > limit) {
+      car.x = road.x+(car.x-road.x)*limit/road.distance;
+      car.y = road.y+(car.y-road.y)*limit/road.distance;
+    }
+  }
+  elapsed += dt;
+  if (elapsed - recording.at(-1)[0] >= interval) {
+    if (recording.length >= 2000) { recording = recording.filter((_,i) => i%2 === 0); interval *= 2; }
+    recording.push(sample());
+  }
+  if (crossed(gates[nextGate],previousX,previousY,car.x,car.y) && ++nextGate === gates.length) complete();
+}
+function ghostAt(t) {
+  if (!ghost || t > ghost.time) return null;
+  const frames = ghost.frames;
+  let lo = 0, hi = frames.length - 1;
+  while (hi-lo > 1) { const mid = (lo+hi)>>1; if (frames[mid][0] <= t) lo=mid; else hi=mid; }
+  const a = frames[lo], b = frames[hi], f = (t-a[0])/(b[0]-a[0]);
+  const angle = Math.atan2(Math.sin(b[3]-a[3]),Math.cos(b[3]-a[3]));
+  return {x:a[1]+(b[1]-a[1])*f, y:a[2]+(b[2]-a[2])*f, heading:a[3]+angle*f};
+}
+function frame(now) {
+  request = 0;
+  if (mode !== 'racing') return;
+  const dt = Math.max(0,(now-previousTime)/1000);
+  previousTime = now;
+  if (dt > .5) { pause(); return; }
+  const held = key => keyboard(key) || [...touches.values()].includes(key);
+  const steering = Number(held('ArrowRight')) - Number(held('ArrowLeft'));
+  const steps = Math.max(1,Math.ceil(dt*100));
+  for (let i=0; i<steps && mode==='racing'; i++) advance(dt/steps,held('ArrowUp'),held('ArrowDown'),steering);
+  refreshStats(); draw();
+  if (mode==='racing') request = requestAnimationFrame(frame);
+}
+const keyboard = bindGameKeys({
+  ArrowLeft:null, ArrowRight:null, ArrowDown:null,
+  ArrowUp:event => { if (!event.repeat && mode==='ready') drive(); },
+  p:event => { if (!event.repeat) { if (mode==='paused') drive(); else pause(); } }
+});
+function clearTouches() {
+  touches.clear(); $('pedals').querySelectorAll('.held').forEach(button => button.classList.remove('held'));
+}
+for (const button of $('pedals').children) {
+  const release = event => {
+    touches.delete(event.pointerId);
+    if (![...touches.values()].includes(button.dataset.key)) button.classList.remove('held');
+  };
+  button.addEventListener('pointerdown', event => {
+    event.preventDefault();
+    if (mode==='ready' && button.dataset.key==='ArrowUp') drive();
+    if (mode!=='racing') return;
+    button.setPointerCapture(event.pointerId);
+    touches.set(event.pointerId,button.dataset.key); button.classList.add('held');
+  });
+  button.addEventListener('pointerup',release); button.addEventListener('lostpointercapture',release);
+  button.addEventListener('pointercancel',release);
+}
+addEventListener('blur',pause);
+document.addEventListener('visibilitychange',() => { if (document.hidden) pause(); });
+$('newbtn').onclick = reset;
+
+function prepareCourse() {
+  const scale = Math.min(3,devicePixelRatio||1) * canvas.clientWidth / width;
+  canvas.width = Math.max(1,Math.round(width*scale)); canvas.height = Math.max(1,Math.round(height*scale));
+  courseImage = document.createElement('canvas');
+  courseImage.width = canvas.width; courseImage.height = canvas.height;
+  const g = courseImage.getContext('2d');
+  g.scale(canvas.width/width,canvas.height/height);
+  drawRallyLandscape(g, currentCourse, width, height, track);
+  g.beginPath(); track.forEach(([x,y],i) => i ? g.lineTo(x,y) : g.moveTo(x,y)); g.closePath();
+  g.lineJoin='round'; g.lineWidth=2*roadRadius+16; g.strokeStyle=boardColors.sand; g.stroke();
+  g.lineWidth=2*roadRadius+3; g.strokeStyle='#e4d7bc'; g.stroke();
+  g.lineWidth=2*roadRadius+3; g.strokeStyle='#cd624f'; g.setLineDash([11,11]); g.stroke(); g.setLineDash([]);
+  g.lineWidth=2*roadRadius-3; g.strokeStyle=boardColors.road; g.stroke();
+  for (let i=6;i<segments.length;i+=18) {
+    const s=segments[i]; g.save(); g.translate(s.x,s.y); g.rotate(Math.atan2(s.ty,s.tx));
+    g.strokeStyle='rgba(255,255,255,.57)'; g.lineWidth=2;
+    g.beginPath(); g.moveTo(-4,-4); g.lineTo(1,0); g.lineTo(-4,4); g.stroke(); g.restore();
+  }
+  g.save(); g.translate(finish.x,finish.y); g.rotate(Math.atan2(finish.ty,finish.tx));
+  const square = (2*roadRadius-8)/10;
+  for (let i=0;i<2;i++) for(let j=0;j<10;j++) {
+    g.fillStyle=(i+j)%2 ? '#283139' : '#f3f3ed'; g.fillRect((i-1)*square,(j-5)*square,square,square);
+  }
+  g.restore();
+}
+function paintCar(vehicle, isGhost) {
+  ctx.save(); ctx.translate(vehicle.x,vehicle.y); ctx.rotate(vehicle.heading);
+  ctx.globalAlpha = isGhost ? .55 : 1;
+  ctx.fillStyle='#19242b'; ctx.fillRect(-8,-6,4,12); ctx.fillRect(4,-6,4,12);
+  ctx.fillStyle=isGhost ? '#95e0ff' : '#f24e47'; ctx.beginPath(); ctx.roundRect(-11,-5,22,10,3); ctx.fill();
+  ctx.fillStyle=isGhost ? '#c6f2ff' : '#fff3d4'; ctx.fillRect(-10,-1,20,2);
+  ctx.fillStyle='#24394c'; ctx.fillRect(-4,-3.5,7,7); ctx.fillStyle='#9cb9cf'; ctx.fillRect(1,-3.5,2.5,7);
+  ctx.fillStyle='#fff1bd'; ctx.fillRect(8,-4,2,2); ctx.fillRect(8,2,2,2); ctx.restore();
+}
+function draw() {
+  if (!courseImage || !car) return;
+  ctx.setTransform(1,0,0,1,0,0); ctx.drawImage(courseImage,0,0);
+  ctx.scale(canvas.width/width,canvas.height/height);
+  if (nextGate < gates.length) {
+    const gate=gates[nextGate]; ctx.save(); ctx.translate(gate.x,gate.y); ctx.rotate(Math.atan2(gate.ty,gate.tx));
+    ctx.fillStyle='rgba(126,240,186,.26)'; ctx.fillRect(-3,2-roadRadius,6,2*roadRadius-4);
+    ctx.fillStyle='#93ffcb'; ctx.strokeStyle='#245c49'; ctx.lineWidth=2;
+    for (const side of [-1,1]) {
+      ctx.beginPath(); ctx.arc(0,side*(roadRadius+1),4,0,7); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  const replay = ghostAt(elapsed);
+  if (replay && mode==='racing') paintCar(replay,true);
+  paintCar(car,false);
+}
+addEventListener('resize',() => { prepareCourse(); draw(); });
+addEventListener('boardcolorschange',() => { prepareCourse(); draw(); });
+buildCoursePicker();
+selectCourse(ls('rallySelectedCourseV1'));
+</script></body></html>

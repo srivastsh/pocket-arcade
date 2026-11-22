@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pig</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;width:min(90vw,420px);padding:30px 20px 22px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;gap:20px}
+.die{width:120px;aspect-ratio:1;border-radius:26px;background:#fff;box-shadow:0 8px 22px rgba(0,0,0,.22),inset 0 -4px 6px rgba(0,0,0,.08);display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);padding:16px}
+.die i{width:70%;aspect-ratio:1;border-radius:50%;background:#1c1c1e;place-self:center}.die i.r{background:#ff453a}
+.die.roll{animation:rl .5s}@keyframes rl{25%{transform:rotate(-14deg) scale(.92)}60%{transform:rotate(12deg) scale(1.05)}}
+.msg{font-weight:600;font-size:17px;min-height:24px}.ctrl{display:flex;gap:12px}.ctrl .btn{padding:14px 32px;font-size:17px}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Pig</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="stats"><div class="stat"><small>You</small><b id="s0">0</b></div><div class="stat"><small>Turn total</small><b id="pts">0</b></div><div class="stat"><small>CPU</small><b id="s1">0</b></div></div>
+<div class="wrap"><div class="die" id="die"></div><div class="msg" id="msg">Your turn</div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title"></h2><p></p><button class="btn">Play Again</button></div></div></div>
+<div class="ctrl"><button class="btn" id="roll">Roll</button><button class="btn sec" id="hold">Hold</button></div>
+<div class="hint">Roll to build a turn total. A 1 wipes it. First to 100 wins. R rolls, H holds.</div></main><script src="common.js"></script><script>
+const P={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};let sc,turn,pts,over,busy,gid=0;const ov=$('ov');
+function face(n){$('die').innerHTML=Array.from({length:9},(_,i)=>P[n].includes(i)?`<i class="${n===1?'r':''}"></i>`:'<i style="visibility:hidden"></i>').join('')}
+function ui(){$('s0').textContent=sc[0];$('s1').textContent=sc[1];$('pts').textContent=pts;$('roll').disabled=$('hold').disabled=busy||over||turn===1}
+function reset(){gid++;sc=[0,0];turn=0;pts=0;over=false;busy=false;ov.classList.add('hide');$('msg').textContent='Your turn';face(1);ui()}
+async function rollDie(){const d=$('die');d.classList.remove('roll');void d.offsetWidth;d.classList.add('roll');for(let i=0;i<5;i++){face(1+rnd(6));await sleep(70)}const n=1+rnd(6);face(n);return n}
+function end(w){over=true;ui();overlay(ov,w?'CPU wins':'You win',`${sc[0]} to ${sc[1]}`,'Play Again',reset)}
+function sw(){turn=1-turn;pts=0;busy=false;$('msg').textContent=turn?'CPU is playing':'Your turn';ui();if(turn===1)cpu()}
+async function roll(){if(busy||over||turn!==0)return;const id=gid;busy=true;ui();const n=await rollDie();if(id!==gid)return;if(n===1){$('msg').textContent='Rolled a 1';await sleep(700);if(id!==gid)return;return sw()}pts+=n;busy=false;ui()}
+function hold(){if(busy||over||turn!==0||!pts)return;sc[0]+=pts;if(sc[0]>=100)return end(0);sw()}
+async function cpu(){const id=gid;busy=true;await sleep(700);if(id!==gid)return;while(true){const n=await rollDie();if(id!==gid)return;if(n===1){$('msg').textContent='CPU rolled a 1';ui();await sleep(800);if(id!==gid)return;return sw()}pts+=n;ui();await sleep(450);if(id!==gid)return;if(pts>=20||sc[1]+pts>=100)break}
+  sc[1]+=pts;if(sc[1]>=100)return end(1);$('msg').textContent='CPU holds';ui();await sleep(600);if(id!==gid)return;sw()}
+$('roll').onclick=roll;$('hold').onclick=hold;addEventListener('keydown',e=>{if(e.metaKey||e.ctrlKey||e.altKey||e.repeat)return;if(e.key===' '||e.key==='r'){e.preventDefault();roll()}if(e.key==='h')hold()});$('newbtn').onclick=reset;reset();</script></body></html>

@@ -1,0 +1,65 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Solitaire</title><link rel="stylesheet" href="shared.css"><link rel="stylesheet" href="cards.css">
+<style>
+.felt{position:relative;width:min(96vw,800px);padding:16px;border-radius:var(--r);background:var(--felt);box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.2)}
+.row{display:grid;grid-template-columns:repeat(7,var(--cw));gap:var(--gap);justify-content:center}
+.row.top{margin-bottom:calc(var(--cw)*.35)}
+.pile{position:relative;height:calc(var(--cw)*1.4);border-radius:calc(var(--cw)*.1);box-shadow:inset 0 0 0 2px rgba(255,255,255,.22)}
+.pile.tab{height:auto;min-height:calc(var(--cw)*1.4)}
+.pile .card{position:absolute;left:0;cursor:pointer}
+.pile.stock.has{box-shadow:none}
+.pile.stock.empty::after{content:"↺";position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.5);font-size:calc(var(--cw)*.5)}
+.pile.found::before{content:attr(data-s);position:absolute;inset:0;display:grid;place-items:center;color:rgba(255,255,255,.28);font-size:calc(var(--cw)*.5)}
+.felt .overlay{border-radius:var(--r)}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Solitaire</h1><div class="right"><button class="btn sec" id="undo">Undo</button><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="seg" id="seg"><button class="on" data-d="1">Draw 1</button><button data-d="3">Draw 3</button></div>
+<div class="stats"><div class="stat"><small>Moves</small><b id="mv">0</b></div><div class="stat"><small>Time</small><b id="time">0:00</b></div></div>
+<div class="felt" id="felt"><div class="row top" id="top"></div><div class="row" id="tabs"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">You won</h2><p id="ovp"></p><button class="btn" id="ovb">Play Again</button></div></div></div>
+<div class="hint">Click a card, then its destination. Double-click sends a card to the foundation. Cmd+Z undoes.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const SU=['♠','♥','♦','♣'],RK=['','A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+let st,sel=null,hist=[],moves=0,t0=0,tm,d3=false,won=false,cw=90;
+const red=s=>s===1||s===2;
+function fit(){const w=Math.min(innerWidth*.96,800)-32;const gap=Math.max(4,w*.015);cw=Math.floor((w-6*gap)/7);const f=$('felt');f.style.setProperty('--cw',cw+'px');f.style.setProperty('--gap',gap+'px');if(st)render()}
+function newGame(){clearInterval(tm);t0=0;moves=0;hist=[];sel=null;won=false;$('ov').classList.add('hide');$('time').textContent='0:00';
+  const d=[];for(let s=0;s<4;s++)for(let r=1;r<=13;r++)d.push({s,r,up:false});for(let i=51;i>0;i--){const j=Math.random()*(i+1)|0;[d[i],d[j]]=[d[j],d[i]]}
+  st={stock:[],waste:[],found:[[],[],[],[]],tab:[[],[],[],[],[],[],[]]};
+  for(let i=0;i<7;i++)for(let j=0;j<=i;j++){const c=d.pop();c.up=j===i;st.tab[i].push(c)}st.stock=d;render()}
+function snap(){hist.push(JSON.stringify(st));if(hist.length>300)hist.shift();if(!t0){t0=Date.now();tm=setInterval(()=>{const s=(Date.now()-t0)/1000|0;$('time').textContent=(s/60|0)+':'+String(s%60).padStart(2,'0')},1000)}}
+function undo(){if(!hist.length||won)return;st=JSON.parse(hist.pop());sel=null;moves=Math.max(0,moves-1);render()}
+function mk(c,sty,cls,k){const down=!c.up;return `<div class="card${red(c.s)?' red':''}${down?' down':''}${cls}" style="${sty}" data-k="${k}"><span class="tl">${RK[c.r]}<br>${SU[c.s]}</span><span class="ct">${SU[c.s]}</span></div>`}
+function isSel(t,i,k){return sel&&sel.t===t&&sel.i===i&&k>=sel.k}
+function render(){
+  let h='';
+  h+=`<div class="pile stock ${st.stock.length?'has':'empty'}" data-t="stock" data-i="0">${st.stock.length?mk({s:0,r:1,up:false},'top:0','',0):''}</div>`;
+  const w=st.waste,show=d3?w.slice(-3):w.slice(-1),base=w.length-show.length;
+  h+=`<div class="pile" data-t="waste" data-i="0" style="box-shadow:none">${show.map((c,n)=>mk(c,`left:${n*cw*.25}px;top:0`,isSel('waste',0,base+n)?' sel':'',base+n)).join('')}</div><div></div>`;
+  for(let f=0;f<4;f++){const p=st.found[f];h+=`<div class="pile found" data-t="found" data-i="${f}" data-s="${p.length?'':'A'}">${p.length?mk(p[p.length-1],'top:0',isSel('found',f,p.length-1)?' sel':'',p.length-1):''}</div>`}
+  $('top').innerHTML=h;
+  h='';st.tab.forEach((p,i)=>{let y=0;const cs=p.map((c,k)=>{const s=mk(c,`top:${y}px`,isSel('tab',i,k)?' sel':'',k);y+=c.up?cw*.32:cw*.14;return s}).join('');const hgt=p.length?y-(p[p.length-1].up?cw*.32:cw*.14)+cw*1.4:cw*1.4;h+=`<div class="pile tab" data-t="tab" data-i="${i}" style="height:${hgt}px">${cs}</div>`});
+  $('tabs').innerHTML=h;$('mv').textContent=moves}
+const pileOf=(t,i)=>t==='tab'?st.tab[i]:t==='waste'?st.waste:st.found[i];
+const canTab=(c,d)=>{if(!d.length)return c.r===13;const t=d[d.length-1];return t.up&&t.r===c.r+1&&red(t.s)!==red(c.s)};
+const canFound=(c,d)=>{if(!d.length)return c.r===1;const t=d[d.length-1];return t.s===c.s&&c.r===t.r+1};
+function move(s,t,i){const src=pileOf(s.t,s.i),dst=pileOf(t,i);if(s.t===t&&s.i===i)return false;const cards=src.slice(s.k);
+  if(t==='found'){if(cards.length!==1||!canFound(cards[0],dst))return false}else if(t==='tab'){if(!canTab(cards[0],dst))return false}else return false;
+  snap();src.splice(s.k);dst.push(...cards);if(s.t==='tab'&&src.length&&!src[src.length-1].up)src[src.length-1].up=true;moves++;check();return true}
+function check(){if(st.found.reduce((a,p)=>a+p.length,0)===52){won=true;clearInterval(tm);setTimeout(()=>{if(!won)return;$('ovp').textContent=`${moves} moves in ${$('time').textContent}`;$('ov').classList.remove('hide')},500)}}
+function drawStock(){snap();if(st.stock.length){for(let n=d3?3:1;n>0&&st.stock.length;n--){const c=st.stock.pop();c.up=true;st.waste.push(c)}}else if(st.waste.length){st.stock=st.waste.reverse().map(c=>(c.up=false,c));st.waste=[]}else{hist.pop();return}moves++}
+function info(e){const p=e.target.closest('.pile');if(!p)return null;const c=e.target.closest('.card');return{t:p.dataset.t,i:+p.dataset.i,k:c?+c.dataset.k:-1}}
+$('felt').addEventListener('click',e=>{if(won)return;const x=info(e);if(!x)return;
+  if(x.t==='stock'){sel=null;drawStock();return render()}
+  if(sel){if(sel.t===x.t&&sel.i===x.i&&sel.k===x.k){sel=null;return render()}
+    if((x.t==='tab'||x.t==='found')&&move(sel,x.t,x.i)){sel=null;return render()}sel=null}
+  if(x.t==='tab'&&x.k>=0){const p=st.tab[x.i];if(!p[x.k].up){if(x.k===p.length-1){snap();p[x.k].up=true;moves++}}else sel=x}
+  else if(x.t==='waste'&&st.waste.length)sel={t:'waste',i:0,k:st.waste.length-1};
+  else if(x.t==='found'&&st.found[x.i].length)sel={t:'found',i:x.i,k:st.found[x.i].length-1};
+  render()});
+$('felt').addEventListener('dblclick',e=>{if(won)return;const x=info(e);if(!x||x.k<0||x.t==='found'||x.t==='stock')return;const p=pileOf(x.t,x.i);const k=p.length-1;if(x.t==='waste'||x.k===k){for(let f=0;f<4;f++){if(move({t:x.t,i:x.i,k},'found',f))break}}sel=null;render()});
+addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&(e.key==='z'||e.key==='Z')&&!e.shiftKey){e.preventDefault();undo()}});
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;d3=b.dataset.d==='3';[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));newGame()};
+$('undo').onclick=undo;$('newbtn').onclick=newGame;$('ovb').onclick=newGame;addEventListener('resize',fit);fit();newGame();
+</script></body></html>

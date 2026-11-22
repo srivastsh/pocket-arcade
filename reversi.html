@@ -1,0 +1,52 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reversi</title><link rel="stylesheet" href="shared.css">
+<style>
+.board{display:grid;grid-template-columns:repeat(8,1fr);gap:2px;width:min(92vw,520px);aspect-ratio:1;padding:10px;border-radius:var(--r);background:var(--felt);box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.2)}
+.c{border:0;padding:0;background:rgba(0,0,0,.14);border-radius:8px;display:grid;place-items:center;cursor:pointer;position:relative}
+.c:hover.ok{background:rgba(255,255,255,.2)}
+.d{width:82%;aspect-ratio:1;border-radius:50%;transition:background .2s;box-shadow:0 2px 4px rgba(0,0,0,.35),inset 0 2px 2px rgba(255,255,255,.3)}
+.d.b{background:radial-gradient(circle at 35% 30%,#4a4a4d,#111)}.d.w{background:radial-gradient(circle at 35% 30%,#fff,#d6d6dc)}
+.d.f{animation:fl .4s}
+@keyframes fl{50%{transform:scaleX(.05)}}
+.ok::after{content:"";width:24%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.45)}
+.msg{font-weight:600;font-size:17px;min-height:24px}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Reversi</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="seg" id="seg"><button data-d="1">Easy</button><button class="on" data-d="5">Hard</button><button data-d="0">2 Players</button></div>
+<div class="stats"><div class="stat"><small id="l1">You</small><b id="s1">2</b></div><div class="stat"><small id="l2">CPU</small><b id="s2">2</b></div></div>
+<div class="msg" id="msg"></div>
+<div class="board" id="board"></div>
+<div class="hint">Use WASD or arrows to choose a square. Return places a disc.</div></main>
+<script src="controls.js"></script><script>
+const $=id=>document.getElementById(id),brd=$('board');
+const Q=[[100,-20,10,5],[-20,-50,-2,-2],[10,-2,-1,-1],[5,-2,-1,-1]],wt=(r,c)=>Q[Math.min(r,7-r)][Math.min(c,7-c)];
+const DI=[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+let b,turn,depth=5,over,prev,busy,aiT;
+for(let i=0;i<64;i++){const c=document.createElement('button');c.className='c';c.dataset.i=i;brd.append(c)}
+function flips(b,r,c,p){if(b[r][c])return[];const res=[];for(const[dr,dc]of DI){const line=[];let rr=r+dr,cc=c+dc;while(rr>=0&&rr<8&&cc>=0&&cc<8&&b[rr][cc]===3-p){line.push([rr,cc]);rr+=dr;cc+=dc}if(line.length&&rr>=0&&rr<8&&cc>=0&&cc<8&&b[rr][cc]===p)res.push(...line)}return res}
+function legal(b,p){const m=[];for(let r=0;r<8;r++)for(let c=0;c<8;c++){const f=flips(b,r,c,p);if(f.length)m.push({r,c,f})}return m}
+function ap(b,m,p){const n=b.map(r=>r.slice());n[m.r][m.c]=p;for(const[r,c]of m.f)n[r][c]=p;return n}
+function can(b,r,c,p){if(b[r][c])return false;for(const[dr,dc]of DI){let rr=r+dr,cc=c+dc,n=0;while(rr>=0&&rr<8&&cc>=0&&cc<8&&b[rr][cc]===3-p){n++;rr+=dr;cc+=dc}if(n&&rr>=0&&rr<8&&cc>=0&&cc<8&&b[rr][cc]===p)return true}return false}
+function mob(b,p){let n=0;for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(can(b,r,c,p))n++;return n}
+function ev(b,p){let s=0;for(let r=0;r<8;r++)for(let c=0;c<8;c++){if(b[r][c]===p)s+=wt(r,c);else if(b[r][c])s-=wt(r,c)}return s+(mob(b,p)-mob(b,3-p))*4}
+function ng(b,p,d,a,bt){const ms=legal(b,p);if(!ms.length){const o=legal(b,3-p);if(!o.length){let x=0;for(const r of b)for(const v of r)x+=v===p?1:v?-1:0;return x*1000}return-ng(b,3-p,d,-bt,-a)}
+  if(!d)return ev(b,p);ms.sort((x,y)=>wt(y.r,y.c)-wt(x.r,x.c));let best=-1e9;for(const m of ms){const s=-ng(ap(b,m,p),3-p,d-1,-bt,-a);if(s>best)best=s;if(best>a)a=best;if(a>=bt)break}return best}
+function cpu(){const ms=legal(b,2);if(depth<=1&&Math.random()<.35)return ms[Math.random()*ms.length|0];let best=-1e9,bm=ms[0];for(const m of ms){const s=-ng(ap(b,m,2),1,depth-1,-1e9,1e9);if(s>best){best=s;bm=m}}return bm}
+function counts(){let x=0,o=0;for(const r of b)for(const v of r){if(v===1)x++;else if(v===2)o++}return[x,o]}
+function render(note){const[x,o]=counts();$('s1').textContent=x;$('s2').textContent=o;const n2=!depth;$('l1').textContent=n2?'Black':'You';$('l2').textContent=n2?'White':'CPU';
+  const lg=over||busy?[]:legal(b,turn);
+  [...brd.children].forEach((c,i)=>{const r=i/8|0,cc=i%8,v=b[r][cc],pv=prev?prev[r][cc]:0;let d=c.firstChild;
+    if(v){if(!d){d=document.createElement('div');c.append(d)}d.className='d '+(v===1?'b':'w')+(pv&&pv!==v?' f':'')}else if(d)d.remove();
+    c.classList.toggle('ok',(!depth||turn===1)&&lg.some(m=>m.r===r&&m.c===cc))});
+  $('msg').textContent=note||(over?(x===o?'Draw':(x>o?(n2?'Black wins':'You win'):(n2?'White wins':'CPU wins'))):(n2?(turn===1?"Black's turn":"White's turn"):(turn===1?'Your turn':'CPU is thinking')))}
+function reset(){clearTimeout(aiT);b=Array.from({length:8},()=>Array(8).fill(0));b[3][3]=b[4][4]=2;b[3][4]=b[4][3]=1;turn=1;over=false;busy=false;prev=null;render()}
+function play(m){prev=b;b=ap(b,m,turn);advance()}
+function advance(){const nx=3-turn;let note='';
+  if(legal(b,nx).length)turn=nx;else if(legal(b,turn).length)note=(nx===1?(depth?'You pass':'Black passes'):(depth?'CPU passes':'White passes'));else over=true;
+  render(note);if(!over&&depth&&turn===2){busy=true;render(note);aiT=setTimeout(()=>{busy=false;play(cpu())},550)}}
+brd.addEventListener('click',e=>{const c=e.target.closest('.c');if(!c||over||busy||(depth&&turn!==1))return;const i=+c.dataset.i,m=legal(b,turn).find(m=>m.r===(i/8|0)&&m.c===i%8);if(m)play(m)});
+$('seg').onclick=e=>{const x=e.target.closest('button');if(!x)return;depth=+x.dataset.d;[...$('seg').children].forEach(y=>y.classList.toggle('on',y===x));reset()};
+$('newbtn').onclick=reset;reset();
+
+enableGridNavigation(brd, '.c', () => !over && !busy);
+</script></body></html>

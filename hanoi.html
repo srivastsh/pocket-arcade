@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hanoi</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;width:min(94vw,600px);padding:16px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow)}
+.pegs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;height:min(300px,52vh);min-height:230px}
+.p{position:relative;display:flex;flex-direction:column-reverse;align-items:center;gap:3px;padding-bottom:10px;border:0;border-radius:16px;background:var(--cell);cursor:pointer}
+.p::before{content:"";position:absolute;bottom:0;top:12%;width:8px;border-radius:4px;background:var(--sub);opacity:.5}
+.p.sel{box-shadow:inset 0 0 0 3px var(--blue)}
+.d{position:relative;z-index:1;height:26px;border-radius:13px;box-shadow:inset 0 2px 2px rgba(255,255,255,.35),0 2px 4px rgba(0,0,0,.2)}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Hanoi</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="seg" id="seg"><button data-n="3">3</button><button class="on" data-n="4">4</button><button data-n="5">5</button><button data-n="6">6</button><button data-n="7">7</button></div>
+<div class="stats"><div class="stat"><small>Moves</small><b id="mv">0</b></div><div class="stat"><small>Par</small><b id="par">15</b></div></div>
+<div class="wrap"><div class="pegs" id="pegs"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Solved</h2><p></p><button class="btn">Play Again</button></div></div></div>
+<div class="hint">Move the whole stack to another peg. A disc can only sit on a larger one. Keys 1 to 3 pick pegs. A/D or ←/→ selects a peg. Return picks up or places a disc.</div></main><script src="controls.js"></script><script src="common.js"></script><script>
+let n=4,pg,sel,mv,over;const ov=$('ov');
+for(let i=0;i<3;i++){const b=document.createElement('button');b.className='p';b.dataset.i=i;b.setAttribute('aria-label','Peg '+(i+1));$('pegs').append(b)}
+let resultTimer;
+function reset(){clearTimeout(resultTimer);pg=[[...Array(n).keys()].map(i=>n-i),[],[]];sel=-1;mv=0;over=false;ov.classList.add('hide');$('par').textContent=2**n-1;render()}
+function render(){[...$('pegs').children].forEach((p,i)=>{p.className='p'+(sel===i?' sel':'');p.innerHTML=pg[i].map(d=>`<div class="d" style="width:${28+d/n*64}%;background:hsl(${210+d*(140/n)} 80% 58%)"></div>`).join('')});$('mv').textContent=mv}
+$('pegs').onclick=e=>{const p=e.target.closest('.p');if(!p||over)return;const i=+p.dataset.i;
+  if(sel<0){if(pg[i].length)sel=i}else{if(i!==sel){const d=pg[sel][pg[sel].length-1],t=pg[i][pg[i].length-1];if(!t||d<t){pg[sel].pop();pg[i].push(d);mv++;if(pg[1].length===n||pg[2].length===n){over=true;render();resultTimer=setTimeout(()=>overlay(ov,'Solved',`${mv} moves. Par ${2**n-1}.`,'Play Again',reset),300);return}}}sel=-1}render()};
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;n=+b.dataset.n;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));reset()};
+addEventListener('keydown',e=>{if(e.key>='1'&&e.key<='3'&&!e.metaKey&&!e.ctrlKey)$('pegs').children[+e.key-1].click()});
+$('newbtn').onclick=reset;reset();
+enableGridNavigation($('pegs'), '.p', () => !over);
+</script></body></html>

@@ -1,0 +1,27 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Life</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);overflow:hidden;line-height:0;touch-action:none}canvas{display:block;cursor:crosshair}
+.ctrl{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center}
+select{padding:8px 12px;border-radius:10px;border:0;background:var(--cell);color:var(--text);font:600 14px var(--font)}.sp{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--sub);font-weight:600}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Life</h1><div class="right"><button class="btn sec" id="newbtn">Clear</button></div></header><main>
+<div class="stats"><div class="stat"><small>Generation</small><b id="gen">0</b></div><div class="stat"><small>Alive</small><b id="alive">0</b></div></div>
+<div class="wrap"><canvas id="cv"></canvas></div>
+<div class="ctrl"><button class="btn" id="play">Play</button><button class="btn sec" id="step">Step</button><button class="btn sec" id="rand">Random</button><button class="btn sec" id="clr">Clear</button></div>
+<div class="ctrl"><select id="pre"><option value="">Add pattern</option><option>Glider</option><option>Pulsar</option><option>Gun</option><option>Pentomino</option></select><label class="sp">Speed <input type="range" id="spd" min="1" max="30" value="10"></label></div>
+<div class="hint">Click or drag to draw cells. Space plays and pauses. The grid wraps at the edges.</div></main><script src="board-colors.js"></script><script src="common.js"></script><script>
+const R=40,C=64,cv=$('cv'),ctx=cv.getContext('2d');let g=new Uint8Array(R*C),s,gen=0,playing=false,acc=0,last=0,paint=-1;
+const PAT={Glider:'.O.\n..O\nOOO',Pentomino:'.OO\nOO.\n.O.',Pulsar:'..OOO...OOO..\n.............\nO....O.O....O\nO....O.O....O\nO....O.O....O\n..OOO...OOO..\n.............\n..OOO...OOO..\nO....O.O....O\nO....O.O....O\nO....O.O....O\n.............\n..OOO...OOO..',
+Gun:'........................O...........\n......................O.O...........\n............OO......OO............OO\n...........O...O....OO............OO\nOO........O.....O...OO..............\nOO........O...O.OO....O.O...........\n..........O.....O.......O...........\n...........O...O....................\n............OO......................'};
+function fit(){const w=Math.min(innerWidth*.94,900),d=devicePixelRatio||1;s=w/C;cv.style.width=w+'px';cv.style.height=s*R+'px';cv.width=Math.round(w*d);cv.height=Math.round(s*R*d);ctx.setTransform(cv.width/w,0,0,cv.width/w,0,0);draw()}
+function draw(){ctx.clearRect(0,0,s*C,s*R);ctx.strokeStyle=boardColors.cell;ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<=C;i++){ctx.moveTo(i*s,0);ctx.lineTo(i*s,R*s)}for(let j=0;j<=R;j++){ctx.moveTo(0,j*s);ctx.lineTo(C*s,j*s)}ctx.stroke();
+  ctx.fillStyle=boardColors.blue;let n=0;for(let r=0;r<R;r++)for(let c=0;c<C;c++)if(g[r*C+c]){n++;ctx.beginPath();ctx.roundRect(c*s+1,r*s+1,s-2,s-2,s*.25);ctx.fill()}$('gen').textContent=gen;$('alive').textContent=n}
+let nxt=new Uint8Array(R*C);
+function step(){const n=nxt;for(let r=0;r<R;r++)for(let c=0;c<C;c++){let k=0;for(let i=-1;i<=1;i++)for(let j=-1;j<=1;j++)if(i||j)k+=g[((r+i+R)%R)*C+(c+j+C)%C];const a=g[r*C+c];n[r*C+c]=a?(k===2||k===3?1:0):(k===3?1:0)}nxt=g;g=n;gen++}
+function put(name){const rows=PAT[name].split('\n'),r0=Math.floor((R-rows.length)/2),c0=Math.floor((C-rows[0].length)/2);rows.forEach((row,i)=>[...row].forEach((ch,j)=>{if(ch==='O')g[(r0+i)*C+c0+j]=1}));draw()}
+function cell(e){const rc=cv.getBoundingClientRect();return[Math.floor((e.clientY-rc.top)/rc.height*R),Math.floor((e.clientX-rc.left)/rc.width*C)]}
+cv.addEventListener('pointerdown',e=>{const[r,c]=cell(e);if(r<0||c<0||r>=R||c>=C)return;paint=g[r*C+c]?0:1;g[r*C+c]=paint;draw();cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(paint<0)return;const[r,c]=cell(e);if(r<0||c<0||r>=R||c>=C)return;if(g[r*C+c]!==paint){g[r*C+c]=paint;draw()}});
+cv.addEventListener('pointerup',()=>paint=-1);cv.addEventListener('pointercancel',()=>paint=-1);
+function frame(t){const dt=Math.min((t-(last||t))/1000,.25);last=t;if(playing){acc+=dt;const iv=1/ +$('spd').value;let k=0;while(acc>=iv){acc-=iv;step();k++}if(k)draw()}requestAnimationFrame(frame)}
+$('play').onclick=()=>{playing=!playing;$('play').textContent=playing?'Pause':'Play'};$('step').onclick=()=>{step();draw()};
+$('rand').onclick=()=>{g=g.map(()=>Math.random()<.28?1:0);gen=0;draw()};$('clr').onclick=$('newbtn').onclick=()=>{g=new Uint8Array(R*C);gen=0;draw()};
+$('pre').onchange=e=>{if(e.target.value)put(e.target.value);e.target.value=''};
+addEventListener('keydown',e=>{if(e.key===' '&&!/^(INPUT|SELECT)$/.test(e.target.tagName)){e.preventDefault();$('play').click()}});addEventListener('boardcolorschange',draw);addEventListener('resize',fit);fit();put('Glider');requestAnimationFrame(frame);</script></body></html>

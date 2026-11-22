@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Fleet</title><link rel="stylesheet" href="shared.css"><style>
+.boards{display:flex;flex-wrap:wrap;gap:22px;justify-content:center}
+.lab{margin-bottom:6px;font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--sub);text-align:center}
+.bd{display:grid;grid-template-columns:repeat(10,1fr);gap:2px;width:min(88vw,340px);padding:8px;border-radius:var(--r-sm);background:linear-gradient(160deg,#3f9bd8,#1c6fb0);box-shadow:var(--shadow)}
+.q{aspect-ratio:1;border:0;padding:0;border-radius:4px;background:rgba(255,255,255,.18);position:relative}
+.bd.en .q:not(.x){cursor:crosshair}.bd.en .q:not(.x):hover{background:rgba(255,255,255,.4)}
+.q.s{background:#d7d9de}.q.m::after{content:"";position:absolute;inset:34%;border-radius:50%;background:rgba(255,255,255,.85)}
+.q.h{background:var(--red)}.q.h::after{content:"✕";position:absolute;inset:0;display:grid;place-items:center;color:#fff;font-size:11px;font-weight:800}
+.q.k{background:#7a1d18}.msg{font-weight:600;font-size:17px;min-height:24px}
+.wrap0{position:fixed;inset:0;pointer-events:none}.wrap0 .overlay:not(.hide){pointer-events:auto;position:fixed}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Fleet</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="msg" id="msg"></div>
+<div class="boards"><div><div class="lab">Enemy waters</div><div class="bd" id="eb"></div></div><div><div class="lab">Your fleet</div><div class="bd" id="pb"></div></div></div>
+<div class="ctrl"><button class="btn sec" id="shuf">Shuffle my ships</button></div>
+<div class="wrap0"><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title"></h2><p></p><button class="btn">Play Again</button></div></div></div><div class="hint">Aim with WASD or arrows. Return fires.</div></main><script src="controls.js"></script><script src="common.js"></script><script>
+const N=10,SZ=[5,4,3,3,2];let pg,eg,ps,es,pShots,eShots,turn,over,started,q=[],aiT;const ov=$('ov');
+function place(){const g=Array.from({length:N},()=>Array(N).fill(-1));const ships=[];SZ.forEach((s,id)=>{while(true){const h=Math.random()<.5,r=rnd(N-(h?0:s-1)),c=rnd(N-(h?s-1:0)),cells=[];let ok=true;for(let i=0;i<s;i++){const rr=r+(h?0:i),cc=c+(h?i:0);if(g[rr][cc]>=0)ok=false;cells.push([rr,cc])}if(ok){cells.forEach(([a,b])=>g[a][b]=id);ships.push(cells);break}}});return[g,ships]}
+const sunk=(ships,sh,id)=>ships[id].every(([r,c])=>sh[r][c]===2);
+function build(el,en){el.innerHTML='';el.className='bd'+(en?' en':'');for(let i=0;i<100;i++){const b=document.createElement(en?'button':'div');b.className='q';b.dataset.i=i;if(en)b.setAttribute('aria-label',String.fromCharCode(65+(i/N|0))+(i%N+1));el.append(b)}}
+function render(){[['eb',eg,es,pShots,true],['pb',pg,ps,eShots,false]].forEach(([id,g,ships,sh,en])=>{[...$(id).children].forEach((b,i)=>{const r=i/N|0,c=i%N,v=sh[r][c],sid=g[r][c];let cl='q';
+  if(v===1)cl+=' m x';else if(v===2)cl+=sunk(ships,sh,sid)?' h k x':' h x';else if(!en&&sid>=0)cl+=' s';else if(en&&over&&sid>=0)cl+=' s';b.className=cl})})}
+function reset(){clearTimeout(aiT);[pg,ps]=place();[eg,es]=place();pShots=Array.from({length:N},()=>Array(N).fill(0));eShots=Array.from({length:N},()=>Array(N).fill(0));turn=0;over=false;started=false;q=[];ov.classList.add('hide');build($('eb'),true);build($('pb'),false);$('shuf').style.display='';$('msg').textContent='Fire at the enemy waters';render()}
+function remaining(ships,sh){return ships.filter((_,id)=>!sunk(ships,sh,id)).length}
+function check(){if(remaining(es,pShots)===0){over=true;render();overlay(ov,'Victory','You sank the enemy fleet','Play Again',reset);return true}if(remaining(ps,eShots)===0){over=true;render();overlay(ov,'Defeat','Your fleet is gone','Play Again',reset);return true}return false}
+function fire(r,c){if(over||turn!==0||pShots[r][c])return;started=true;$('shuf').style.display='none';const id=eg[r][c];pShots[r][c]=id>=0?2:1;render();
+  $('msg').textContent=id>=0?(sunk(es,pShots,id)?'You sank a ship':'Hit'):'Miss';if(check())return;turn=1;aiT=setTimeout(ai,650)}
+function ai(){if(over||turn!==1)return;let r,c;while(q.length){[r,c]=q.pop();if(r>=0&&r<N&&c>=0&&c<N&&!eShots[r][c])break;r=-1}
+  if(r===undefined||r<0||eShots[r][c]){const o=[];for(let i=0;i<N;i++)for(let j=0;j<N;j++)if(!eShots[i][j]&&(i+j)%2===0)o.push([i,j]);const all=o.length?o:(()=>{const a=[];for(let i=0;i<N;i++)for(let j=0;j<N;j++)if(!eShots[i][j])a.push([i,j]);return a})();[r,c]=all[rnd(all.length)]}
+  const id=pg[r][c];eShots[r][c]=id>=0?2:1;
+  if(id>=0){if(sunk(ps,eShots,id)){q=[];$('msg').textContent='Enemy sank your ship'}else{$('msg').textContent='Enemy hit your ship';q.push([r-1,c],[r+1,c],[r,c-1],[r,c+1])}}else $('msg').textContent='Enemy missed';
+  render();if(check())return;turn=0}
+$('eb').addEventListener('click',e=>{const b=e.target.closest('.q');if(turn!==0)return;if(b)fire((+b.dataset.i)/N|0,(+b.dataset.i)%N)});
+$('shuf').onclick=()=>{if(started)return;[pg,ps]=place();render()};$('newbtn').onclick=reset;reset();
+enableGridNavigation($('eb'), '.q', () => !over && turn === 0);
+</script></body></html>

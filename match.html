@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Match</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;padding:10px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);width:min(94vw,500px);touch-action:none}
+.g{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.c{aspect-ratio:1;border:0;padding:0;border-radius:24%;color:rgba(255,255,255,.85);font-size:clamp(14px,4vw,22px);cursor:pointer;box-shadow:inset 0 -3px 5px rgba(0,0,0,.2),inset 0 3px 3px rgba(255,255,255,.35);transition:transform .12s}
+.c.sel{transform:scale(.82);outline:3px solid var(--text);outline-offset:1px}
+.c.pop{animation:pop .2s forwards}.c.new{animation:drop .25s}
+@keyframes pop{to{transform:scale(0);opacity:0}}@keyframes drop{from{transform:translateY(-120%);opacity:.3}}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Match</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="stats"><div class="stat"><small>Score</small><b id="score">0</b></div><div class="stat"><small>Moves</small><b id="mv">25</b></div><div class="stat"><small>Best</small><b id="best">0</b></div></div>
+<div class="wrap"><div class="g" id="g"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Game Over</h2><p></p><button class="btn">Play Again</button></div></div></div>
+<div class="hint">Swap neighbors to line up three or more. Click two gems or drag. WASD or arrows move between gems. Return selects.</div></main><script src="controls.js"></script><script src="common.js"></script><script>
+const N=8,COL=['#ff453a','#ff9f0a','#ffd60a','#30d158','#0a84ff','#bf5af2'],GL=['●','▲','■','◆','★','♥'];
+let g,score,left,busy,sel,over,fresh=new Set(),best=+ls('bestMatch')||0,gid=0;const gr=$('g'),ov=$('ov');
+for(let i=0;i<64;i++){const b=document.createElement('button');b.className='c';b.dataset.i=i;b.setAttribute('aria-label','Gem');gr.append(b)}
+function ms(){const s=new Set();for(let r=0;r<N;r++)for(let c=0;c<N;c++){const v=g[r][c];if(v<0)continue;
+  if(c<N-2&&g[r][c+1]===v&&g[r][c+2]===v){s.add(r*N+c);s.add(r*N+c+1);s.add(r*N+c+2)}
+  if(r<N-2&&g[r+1][c]===v&&g[r+2][c]===v){s.add(r*N+c);s.add((r+1)*N+c);s.add((r+2)*N+c)}}return s}
+function hasMove(){for(let r=0;r<N;r++)for(let c=0;c<N;c++)for(const[dr,dc]of[[0,1],[1,0]]){const r2=r+dr,c2=c+dc;if(r2>=N||c2>=N)continue;[g[r][c],g[r2][c2]]=[g[r2][c2],g[r][c]];const m=ms().size;[g[r][c],g[r2][c2]]=[g[r2][c2],g[r][c]];if(m)return true}return false}
+function init() {
+  do {
+    g = Array.from({length:N}, () => []);
+    for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+      const choices = COL.map((_, v) => v).filter(v =>
+        !(c >= 2 && g[r][c-1] === v && g[r][c-2] === v) &&
+        !(r >= 2 && g[r-1][c] === v && g[r-2][c] === v));
+      g[r][c] = choices[rnd(choices.length)];
+    }
+  } while (!hasMove());
+}
+function render(pop){[...gr.children].forEach((b,i)=>{const v=g[i/N|0][i%N];b.style.background=v<0?'transparent':`linear-gradient(160deg,${COL[v]},${COL[v]}cc)`;b.textContent=v<0?'':GL[v];b.className='c'+(sel===i?' sel':'')+(pop&&pop.has(i)?' pop':'')+(fresh.has(i)?' new':'')});fresh.clear();$('score').textContent=score;$('mv').textContent=left;$('best').textContent=best}
+function reset(){gid++;init();score=0;left=25;busy=false;sel=-1;over=false;ov.classList.add('hide');render()}
+async function resolve(id){let combo=1;while(true){const m=ms();if(!m.size)break;score+=m.size*10*combo;combo++;render(m);await sleep(220);if(id!==gid)return;m.forEach(i=>g[i/N|0][i%N]=-1);
+  for(let c=0;c<N;c++){let w=N-1;for(let r=N-1;r>=0;r--)if(g[r][c]>=0)g[w--][c]=g[r][c];for(let r=w;r>=0;r--){g[r][c]=rnd(6);fresh.add(r*N+c)}}render();await sleep(260);if(id!==gid)return}
+  if(!hasMove())init();render()}
+async function swap(a,b){const id=gid;busy=true;sel=-1;const[r1,c1]=[a/N|0,a%N],[r2,c2]=[b/N|0,b%N];const sw=()=>[g[r1][c1],g[r2][c2]]=[g[r2][c2],g[r1][c1]];
+  sw();render();await sleep(150);if(id!==gid)return;if(!ms().size){sw();render();busy=false;return}left--;await resolve(id);if(id!==gid)return;
+  if(score>best){best=score;ls('bestMatch',best)}render();busy=false;if(left<=0){over=true;overlay(ov,'Game Over','Score '+score,'Play Again',reset)}}
+const adj=(a,b)=>Math.abs((a/N|0)-(b/N|0))+Math.abs(a%N-b%N)===1;
+let dn=-1;gr.addEventListener('pointerdown',e=>{const b=e.target.closest('.c');if(b)dn=+b.dataset.i});
+gr.addEventListener('pointercancel',()=>dn=-1);
+gr.addEventListener('pointerup',e=>{if(busy||over||dn<0)return;const t=document.elementFromPoint(e.clientX,e.clientY)||e.target,b=t&&t.closest&&t.closest('.c');const i=b?+b.dataset.i:-1,d=dn;dn=-1;if(i<0)return;
+  if(i!==d&&adj(i,d)){swap(d,i);return}if(i===d)selectGem(i)});
+function selectGem(i){if(busy||over)return;if(sel<0){sel=i;render()}else if(sel===i){sel=-1;render()}else if(adj(sel,i))swap(sel,i);else{sel=i;render()}}
+gr.addEventListener('click', event => {
+  const button = event.target.closest('.c');
+  if (event.detail === 0 && button) selectGem(+button.dataset.i);
+});
+$('newbtn').onclick=reset;reset();
+enableGridNavigation(gr, '.c', () => !busy && !over);
+</script></body></html>

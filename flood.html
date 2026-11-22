@@ -1,0 +1,19 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Flood</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;padding:10px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);width:min(92vw,480px)}
+.g{display:grid;gap:1px;border-radius:12px;overflow:hidden}.g i{aspect-ratio:1;transition:background .18s}
+.pal{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}.pal button{width:48px;height:48px;border-radius:50%;border:0;cursor:pointer;box-shadow:inset 0 -3px 5px rgba(0,0,0,.2),inset 0 3px 3px rgba(255,255,255,.35),0 2px 6px rgba(0,0,0,.2);transition:transform .1s}.pal button:active{transform:scale(.88)}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Flood</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="seg" id="seg"><button data-n="10" data-m="18">Small</button><button class="on" data-n="14" data-m="25">Medium</button><button data-n="18" data-m="32">Large</button></div>
+<div class="stats"><div class="stat"><small>Moves</small><b id="mv">0</b></div><div class="stat"><small>Limit</small><b id="lim">25</b></div></div>
+<div class="wrap" id="wrap"><div class="g" id="g"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title"></h2><p></p><button class="btn">Play Again</button></div></div></div>
+<div class="pal" id="pal"></div>
+<div class="hint">Flood from the top-left corner until the whole board is one color. Keys 1 to 6 pick colors.</div></main><script src="common.js"></script><script>
+const COL=['#ff453a','#ff9f0a','#ffd60a','#30d158','#0a84ff','#bf5af2'];let n=14,lim=25,g,mv,over;const gr=$('g'),ov=$('ov');
+const CN=['Red','Orange','Yellow','Green','Blue','Purple'];COL.forEach((c,i)=>{const b=document.createElement('button');b.style.background=c;b.setAttribute('aria-label',CN[i]+' ('+(i+1)+')');b.onclick=()=>play(i);$('pal').append(b)});
+let resultTimer;
+function reset(){clearTimeout(resultTimer);g=Array.from({length:n*n},()=>rnd(6));mv=0;over=false;ov.classList.add('hide');gr.style.gridTemplateColumns=`repeat(${n},1fr)`;gr.innerHTML='';g.forEach(v=>{const i=document.createElement('i');gr.append(i)});render()}
+function render(){[...gr.children].forEach((e,i)=>e.style.background=COL[g[i]]);$('mv').textContent=mv;$('lim').textContent=lim}
+function play(c){if(over||g[0]===c)return;const o=g[0],st=[0],seen=new Set([0]);while(st.length){const i=st.pop();g[i]=c;const r=i/n|0,k=i%n;for(const j of[k>0&&i-1,k<n-1&&i+1,r>0&&i-n,r<n-1&&i+n]){if(j!==false&&!seen.has(j)&&g[j]===o){seen.add(j);st.push(j)}}}
+  mv++;render();if(g.every(v=>v===g[0])){over=true;resultTimer=setTimeout(()=>overlay(ov,'Flooded',`${mv} moves`,'Play Again',reset),350)}else if(mv>=lim){over=true;resultTimer=setTimeout(()=>overlay(ov,'Out of moves','Try again','Try Again',reset),350)}}
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;n=+b.dataset.n;lim=+b.dataset.m;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));reset()};
+addEventListener('keydown',e=>{if(e.key>='1'&&e.key<='6'&&!e.metaKey&&!e.ctrlKey)play(+e.key-1)});
+$('newbtn').onclick=reset;reset();</script></body></html>

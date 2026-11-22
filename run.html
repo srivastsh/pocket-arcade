@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Run</title><link rel="stylesheet" href="shared.css">
+<style>
+.board{position:relative;width:min(94vw,760px);aspect-ratio:3/1;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);overflow:hidden;line-height:0;touch-action:none;cursor:pointer}
+canvas{width:100%;height:100%;display:block}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Run</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="stats"><div class="stat"><small>Distance</small><b id="score">0</b></div><div class="stat"><small>Best</small><b id="best">0</b></div></div>
+<div class="board" id="board"><canvas id="cv"></canvas><div class="overlay" id="ov"><div class="game-sheet" role="group" aria-labelledby="ovt"><h2 id="ovt">Run</h2><p id="ovp">Tap or press W, ↑ or Space to jump. Hold S or ↓ to duck.</p></div></div></div>
+</main>
+<script src="board-colors.js"></script><script src="controls.js"></script><script>
+if(window.CanvasRenderingContext2D&&!CanvasRenderingContext2D.prototype.roundRect)CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){r=Array.isArray(r)?r[0]:r;r=Math.max(0,Math.min(+r||0,Math.abs(w)/2,Math.abs(h)/2));this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath()};
+const $=id=>document.getElementById(id),cv=$('cv'),ctx=cv.getContext('2d'),ov=$('ov');
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+const W=720,H=240,GY=196,dpr=Math.min(devicePixelRatio||1,3);cv.width=W*dpr;cv.height=H*dpr;ctx.scale(dpr,dpr);
+let y,vy,obs,dist,spd,nextX,state='idle',last=0,best=+ls('bestRun')||0,t=0,off=0;
+function reset(){y=GY;vy=0;obs=[];dist=0;spd=300;nextX=W+200;state='idle';$('score').textContent=0;$('best').textContent=best;$('ovt').textContent='Run';$('ovp').textContent='Tap or press W, ↑ or Space to jump. Hold S or ↓ to duck.';ov.classList.remove('hide')}
+function jump(){if(state==='dead'){if(performance.now()-dieT<=400)return;reset()}if(state==='idle'){state='run';ov.classList.add('hide')}if(y>=GY&&!held('ArrowDown'))vy=-640}
+let dieT=0;
+
+function spawn(){const r=Math.random();if(dist>120&&r<.25)obs.push({k:'b',x:nextX,w:40,h:26,y:GY-56});else{const n=1+(Math.random()*3|0),h=34+Math.random()*24;obs.push({k:'c',x:nextX,w:16*n+8,h:h,y:GY-h,n})}nextX+=(.8+Math.random()*.9)*Math.max(spd,300)+120}
+function frame(ts){const dt=Math.min((ts-(last||ts))/1000,.033);last=ts;t+=dt;
+  if(state==='run'){spd=Math.min(300+dist*.9,700);dist+=spd*dt/22;off=(off+spd*dt)%40;
+    vy+=2000*dt;y+=vy*dt;if(y>=GY){y=GY;vy=0}
+    for(const o of obs)o.x-=spd*dt;nextX-=spd*dt;obs=obs.filter(o=>o.x>-80);if(nextX<W+100)spawn();
+    const pw=held('ArrowDown')&&y>=GY?44:30,ph=held('ArrowDown')&&y>=GY?22:44,px=70-pw/2+15,py=y-ph;
+    for(const o of obs)if(px+pw-6>o.x+3&&px+6<o.x+o.w-3&&py+ph-4>o.y&&py+4<o.y+o.h){state='dead';dieT=performance.now();const s=Math.floor(dist);if(s>best){best=s;ls('bestRun',best)}$('best').textContent=best;$('ovt').textContent='Game Over';$('ovp').textContent=Math.floor(dist)+' m. Tap or press W to retry.';ov.classList.remove('hide')}
+    $('score').textContent=Math.floor(dist)}
+  draw();requestAnimationFrame(frame)}
+function draw(){ctx.clearRect(0,0,W,H);const tx=boardColors.text;
+  ctx.fillStyle=boardColors.line;ctx.fillRect(0,GY,W,2);for(let x=-off;x<W;x+=40)ctx.fillRect(x,GY+10,14,2);
+  for(const o of obs){if(o.k==='c'){ctx.fillStyle=boardColors.green;for(let i=0;i<o.n;i++){ctx.beginPath();ctx.roundRect(o.x+4+i*16,o.y+(i%2?8:0),12,o.h-(i%2?8:0),5);ctx.fill()}}
+    else{ctx.fillStyle=boardColors.orange;ctx.beginPath();ctx.roundRect(o.x,o.y,o.w,o.h,10);ctx.fill();ctx.fillStyle='rgba(255,255,255,.7)';const f=Math.sin(t*22)*8;ctx.beginPath();ctx.ellipse(o.x+18,o.y+4,10,5+f/2,0,0,7);ctx.fill();ctx.fillStyle='#1c1c1e';ctx.beginPath();ctx.arc(o.x+32,o.y+10,2.6,0,7);ctx.fill()}}
+  const d=held('ArrowDown')&&y>=GY,pw=d?44:30,ph=d?22:44,x=70-pw/2+15,py=y-ph;
+  ctx.fillStyle=state==='dead'?boardColors.red:boardColors.blue;ctx.beginPath();ctx.roundRect(x,py,pw,ph,10);ctx.fill();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x+pw-9,py+(d?8:12),4.5,0,7);ctx.fill();ctx.fillStyle='#1c1c1e';ctx.beginPath();ctx.arc(x+pw-8,py+(d?8:12),2,0,7);ctx.fill();
+  if(y>=GY&&state==='run'){const l=Math.sin(t*26)*5;ctx.fillStyle=tx;ctx.fillRect(x+7+l,y-2,5,5);ctx.fillRect(x+pw-14-l,y-2,5,5)}}
+$('board').addEventListener('pointerdown',e=>{e.preventDefault();jump()});
+function jumpKey(event) { if (!event.repeat) jump(); }
+const held = bindGameKeys({ ArrowUp: jumpKey, ArrowDown: null, ' ': jumpKey });
+$('newbtn').onclick=reset;reset();requestAnimationFrame(frame);
+</script></body></html>

@@ -1,0 +1,43 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Memory</title><link rel="stylesheet" href="shared.css">
+<style>
+.wrap{position:relative;padding:14px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.grid{display:grid;gap:10px;width:min(86vw,calc(var(--n)*96px))}
+.card{aspect-ratio:1;perspective:700px;border:0;padding:0;background:none;cursor:pointer;container-type:inline-size}
+.in{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .4s cubic-bezier(.3,.8,.3,1)}
+.card.up .in,.card.ok .in{transform:rotateY(180deg)}
+.f{position:absolute;inset:0;border-radius:16%;backface-visibility:hidden;-webkit-backface-visibility:hidden;display:grid;place-items:center;box-shadow:0 2px 6px rgba(0,0,0,.14)}
+.f.front{background:linear-gradient(160deg,#5ac8fa,#0a84ff);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 2px 6px rgba(0,0,0,.14)}
+.f.front::after{content:"";width:26%;aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.35)}
+.f.back{background:var(--solid);transform:rotateY(180deg);font-size:min(9vw,46px);font-size:52cqw;line-height:1}
+.card.ok .f.back{box-shadow:inset 0 0 0 100vmax rgba(52,199,89,.28),0 2px 6px rgba(0,0,0,.14)}
+.card.ok{animation:ok .35s .3s}
+@keyframes ok{50%{transform:scale(1.07)}}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Memory</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="seg" id="seg"><button class="on" data-n="4">Easy</button><button data-n="6">Hard</button></div>
+<div class="stats"><div class="stat"><small>Moves</small><b id="moves">0</b></div><div class="stat"><small>Time</small><b id="time">0</b></div><div class="stat"><small>Best</small><b id="best">-</b></div></div>
+<div class="wrap"><div class="grid" id="grid"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Well done</h2><p id="ovp"></p><button class="btn" id="ovb">Play Again</button></div></div></div>
+<div class="hint">Use WASD or arrows to choose a card. Return flips it.</div></main>
+<script src="controls.js"></script><script>
+const $=id=>document.getElementById(id),grid=$('grid'),ov=$('ov');
+const E=['🍎','🍊','🍋','🍉','🍇','🍓','🥝','🍑','🥑','🌽','🥕','🍄','🌸','⭐','🌙','🔥','💎','🎈'];
+let n=4,moves,pick,lock,left,t0,tm,gid=0;
+function best(){try{return +localStorage.getItem('memBest'+n)||0}catch(e){return 0}}
+function reset(){clearInterval(tm);gid++;t0=0;moves=0;pick=[];lock=false;left=n*n/2;$('moves').textContent=0;$('time').textContent=0;$('best').textContent=best()||'-';ov.classList.add('hide');
+  grid.style.setProperty('--n',n);grid.style.gridTemplateColumns=`repeat(${n},1fr)`;grid.innerHTML='';
+  const sh=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};const d=sh(E.slice()).slice(0,left);const deck=sh([...d,...d]);
+  deck.forEach(e=>{const b=document.createElement('button');b.className='card';b.dataset.e=e;b.setAttribute('aria-label','Card');b.innerHTML=`<div class="in"><div class="f front"></div><div class="f back">${e}</div></div>`;grid.append(b)})}
+grid.addEventListener('click',e=>{const c=e.target.closest('.card');if(!c||lock||c.classList.contains('up')||c.classList.contains('ok'))return;
+  if(!t0){t0=Date.now();tm=setInterval(()=>$('time').textContent=(Date.now()-t0)/1000|0,500)}
+  c.classList.add('up');pick.push(c);if(pick.length<2)return;
+  moves++;$('moves').textContent=moves;const[a,b]=pick;pick=[];
+  if(a.dataset.e===b.dataset.e){a.classList.replace('up','ok');b.classList.replace('up','ok');if(!--left)win()}
+  else{lock=true;const g=gid;setTimeout(()=>{if(g!==gid)return;a.classList.remove('up');b.classList.remove('up');lock=false},750)}});
+function win(){clearInterval(tm);const s=(Date.now()-t0)/1000|0,b=best();if(!b||moves<b){try{localStorage.setItem('memBest'+n,moves)}catch(e){}$('best').textContent=moves}
+  const g=gid;setTimeout(()=>{if(g!==gid)return;$('ovp').textContent=`${moves} moves in ${s}s`;ov.classList.remove('hide')},800)}
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;n=+b.dataset.n;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));reset()};
+$('newbtn').onclick=reset;$('ovb').onclick=reset;reset();
+
+enableGridNavigation(grid, '.card');
+</script></body></html>

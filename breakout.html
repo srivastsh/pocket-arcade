@@ -1,0 +1,72 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Breakout</title><link rel="stylesheet" href="shared.css">
+<style>
+.board{position:relative;width:min(92vw,480px,calc((100vh - 240px)*.75));aspect-ratio:3/4;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);overflow:hidden;touch-action:none;line-height:0;cursor:none}
+canvas{width:100%;height:100%;display:block}
+.overlay{cursor:default}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Breakout</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="stats"><div class="stat"><small>Score</small><b id="score">0</b></div><div class="stat"><small>Lives</small><b id="lives">3</b></div><div class="stat"><small>Level</small><b id="lvl">1</b></div></div>
+<div class="board" id="board"><canvas id="cv"></canvas><div class="overlay" id="ov"><div class="game-sheet" role="group" aria-labelledby="ovt"><h2 id="ovt">Breakout</h2><p id="ovp">Clear every brick. Don't let the ball drop.</p><button class="btn" id="ovb">Play</button></div></div></div>
+<div class="hint">Move with A/D, ←/→, the mouse or touch. Click, tap or press W, ↑ or Space to launch.</div>
+</main>
+<script src="board-colors.js"></script><script src="controls.js"></script><script>
+if(window.CanvasRenderingContext2D&&!CanvasRenderingContext2D.prototype.roundRect)CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){r=Array.isArray(r)?r[0]:r;r=Math.max(0,Math.min(+r||0,Math.abs(w)/2,Math.abs(h)/2));this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath()};
+const $=id=>document.getElementById(id),cv=$('cv'),ctx=cv.getContext('2d'),ov=$('ov');
+const W=480,H=640,dpr=Math.min(devicePixelRatio||1,3);cv.width=W*dpr;cv.height=H*dpr;ctx.scale(dpr,dpr);
+const COLS=['red','orange','yellow','green','blue','purple'];
+let px,pw=92,bx,by,vx,vy,bricks,score,lives,lvl,state='idle',last;
+const PY=H-52,BR=7;
+
+function build(){bricks=[];const m=20,g=6,bw=(W-2*m-7*g)/8,bh=20;const rows=Math.min(5+lvl,8);
+  for(let r=0;r<rows;r++)for(let c=0;c<8;c++)bricks.push({x:m+c*(bw+g),y:70+r*(bh+g),w:bw,h:bh,col:COLS[r%6],alive:1})}
+function hud(){$('score').textContent=score;$('lives').textContent=lives;$('lvl').textContent=lvl}
+function newBall(){state='ready';bx=px;by=PY-BR-2;vx=vy=0}
+function speed(){return 400+(lvl-1)*45}
+function full(){score=0;lives=3;lvl=1;pw=92;px=W/2;build();newBall();hud();ov.classList.add('hide')}
+function launch(){if(state==='ready'){const a=(-90+(Math.random()*30-15))*Math.PI/180,s=speed();vx=Math.cos(a)*s;vy=Math.sin(a)*s;state='run';last=performance.now()}}
+function show(t,p,b){$('ovt').textContent=t;$('ovp').textContent=p;$('ovb').textContent=b;ov.classList.remove('hide')}
+function step(dt){
+  const sp=Math.hypot(vx,vy);
+  bx+=vx*dt;by+=vy*dt;
+  if(bx<BR){bx=BR;vx=Math.abs(vx)}if(bx>W-BR){bx=W-BR;vx=-Math.abs(vx)}if(by<BR){by=BR;vy=Math.abs(vy)}
+  if(vy>0&&by+BR>=PY&&by+BR<=PY+14+vy*dt&&bx>px-pw/2-BR&&bx<px+pw/2+BR){
+    const o=Math.max(-1,Math.min(1,(bx-px)/(pw/2))),a=(-90+o*62)*Math.PI/180;vx=Math.cos(a)*sp;vy=Math.sin(a)*sp;by=PY-BR}
+  for(const b of bricks){if(!b.alive)continue;
+    const cx=Math.max(b.x,Math.min(bx,b.x+b.w)),cy=Math.max(b.y,Math.min(by,b.y+b.h)),dx=bx-cx,dy=by-cy;
+    if(dx*dx+dy*dy<=BR*BR){b.alive=0;score+=10;
+      const ox=BR-Math.abs(dx),oy=BR-Math.abs(dy);
+      if(dx===0&&dy===0){vy=-vy}else if(Math.abs(dx)>Math.abs(dy)){vx=dx>0?Math.abs(vx):-Math.abs(vx)}else{vy=dy>0?Math.abs(vy):-Math.abs(vy)}
+      const k=1.012;vx*=k;vy*=k;hud();break}}
+  if(!bricks.some(b=>b.alive)){lvl++;build();newBall();hud();return}
+  if(by>H+20){lives--;hud();if(lives<=0){state='over';show('Game Over','Score '+score,'Try Again')}else newBall()}
+}
+function frame(t){
+  const dt=Math.min((t-(last||t))/1000,1/30);last=t;
+  if(held('ArrowLeft'))px-=520*dt;if(held('ArrowRight'))px+=520*dt;
+  px=Math.max(pw/2,Math.min(W-pw/2,px));
+  if(state==='ready')bx=px;
+  if(state==='run'){step(dt/2);if(state==='run')step(dt/2)}
+  draw();requestAnimationFrame(frame)}
+function rr(x,y,w,h,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  for(const b of bricks)if(b.alive){rr(b.x,b.y,b.w,b.h,5,boardColors[b.col])}
+  rr(px-pw/2,PY,pw,12,6,boardColors.text);
+  ctx.fillStyle=boardColors.blue;ctx.beginPath();ctx.arc(bx,by,BR,0,7);ctx.fill();
+}
+const board=$('board');
+function mv(e){const r=cv.getBoundingClientRect();px=(e.clientX-r.left)/r.width*W}
+board.addEventListener('pointermove',mv);
+board.addEventListener('pointerdown',e=>{mv(e);launch()});
+function launchKey(event) {
+  if (event.repeat) return;
+  if (state === 'over' || state === 'idle') full();
+  launch();
+}
+const held = bindGameKeys({
+  ArrowLeft: null, ArrowRight: null, ArrowUp: launchKey, ' ': launchKey
+});
+$('ovb').onclick=full;$('newbtn').onclick=full;
+score=0;lives=3;lvl=1;px=W/2;build();newBall();state='idle';hud();requestAnimationFrame(frame);
+</script></body></html>

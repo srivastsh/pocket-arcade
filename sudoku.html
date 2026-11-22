@@ -1,0 +1,76 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sudoku</title><link rel="stylesheet" href="shared.css">
+<style>
+.grid{display:grid;grid-template-columns:repeat(9,1fr);width:min(92vw,468px);border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);padding:8px;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);position:relative}
+.s{aspect-ratio:1;display:grid;place-items:center;font-size:clamp(17px,4.8vw,26px);font-weight:500;cursor:pointer;position:relative;border-radius:6px;margin:0;box-shadow:inset 0 0 0 .5px var(--line)}
+.s.g{font-weight:700}
+.s.u{color:var(--blue)}
+.s.peer{background:var(--cell)}
+.s.same{background:rgba(10,132,255,.22)}
+.s.sel.u{color:#fff}
+.s.sel{background:var(--blue);color:#fff}
+.s.err{color:var(--red)}
+.s.sel.err{color:#ffd1ce}
+.s.b-r{border-right:2px solid var(--line2)}
+.s.b-b{border-bottom:2px solid var(--line2)}
+.nt{position:absolute;inset:2px;display:grid;grid-template-columns:repeat(3,1fr);font-size:clamp(7px,1.9vw,10px);font-weight:600;color:var(--sub);line-height:1;place-items:center}
+.pad{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;width:min(92vw,468px)}
+.pad button{aspect-ratio:.8;border:0;border-radius:12px;background:var(--card);box-shadow:var(--shadow);font-size:clamp(18px,5vw,26px);font-weight:600;color:var(--blue);cursor:pointer;transition:transform .1s}
+.pad button:active{transform:scale(.92)}
+.pad button:disabled{opacity:.3;cursor:default}
+.tools{display:flex;gap:8px}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Sudoku</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="seg" id="seg"><button data-g="40">Easy</button><button class="on" data-g="33">Medium</button><button data-g="27">Hard</button></div>
+<div class="stats"><div class="stat"><small>Time</small><b id="time">0:00</b></div><div class="stat"><small>Best</small><b id="best">-</b></div></div>
+<div class="grid" id="grid"><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Solved</h2><p id="ovp"></p><button class="btn" id="ovb">Play Again</button></div></div></div>
+<div class="tools"><button class="btn sec" id="notes">Notes: Off</button><button class="btn sec" id="erase">Erase</button><button class="btn sec" id="hint">Hint</button></div>
+<div class="pad" id="pad"></div>
+<div class="hint">Choose a cell with WASD, the arrow keys or a click, then type 1 to 9. N toggles notes.</div>
+</main>
+<script src="controls.js"></script><script>
+const $=id=>document.getElementById(id),grid=$('grid'),ov=$('ov');
+let givens=33,sol,pz,val,gv,nt,sel=-1,noteMode=false,t0,tm,done,rid=0;
+const pop=m=>{let k=0;while(m){m&=m-1;k++}return k};
+function solve(g,lim,rnd){const rm=Array(9).fill(0),cm=Array(9).fill(0),bm=Array(9).fill(0);
+  for(let i=0;i<81;i++)if(g[i]){const v=1<<g[i],r=i/9|0,c=i%9;rm[r]|=v;cm[c]|=v;bm[(r/3|0)*3+(c/3|0)]|=v}
+  let n=0;
+  function rec(){let bi=-1,bc=10,bk=0;
+    for(let i=0;i<81;i++){if(g[i])continue;const r=i/9|0,c=i%9,m=~(rm[r]|cm[c]|bm[(r/3|0)*3+(c/3|0)])&0x3fe,k=pop(m);if(k<bc){bc=k;bi=i;bk=m;if(k<2)break}}
+    if(bi<0){n++;return n>=lim}if(!bc)return false;
+    const r=bi/9|0,c=bi%9,b=(r/3|0)*3+(c/3|0);let ds=[1,2,3,4,5,6,7,8,9];if(rnd)ds.sort(()=>Math.random()-.5);
+    for(const v of ds){const bit=1<<v;if(!(bk&bit))continue;g[bi]=v;rm[r]|=bit;cm[c]|=bit;bm[b]|=bit;if(rec())return true;g[bi]=0;rm[r]&=~bit;cm[c]&=~bit;bm[b]&=~bit}return false}
+  rec();return n}
+function gen(){const s=Array(81).fill(0);solve(s,1,true);const p=s.slice(),ord=[...Array(81).keys()];for(let i=80;i>0;i--){const j=Math.random()*(i+1)|0;[ord[i],ord[j]]=[ord[j],ord[i]]}let rem=81-givens;
+  for(const i of ord){if(!rem)break;const v=p[i];p[i]=0;if(solve(p.slice(),2,false)!==1)p[i]=v;else rem--}return[s,p]}
+for(let i=0;i<81;i++){const d=document.createElement('div');d.className='s';d.dataset.i=i;grid.insertBefore(d,ov)}
+const pad=$('pad');for(let n=1;n<=9;n++){const b=document.createElement('button');b.textContent=n;b.dataset.n=n;pad.append(b)}
+function best(){try{return +localStorage.getItem('sdBest'+givens)||0}catch(e){return 0}}
+const fmt=s=>(s/60|0)+':'+String(s%60).padStart(2,'0');
+let resultTimer;
+function reset(){clearTimeout(resultTimer);clearInterval(tm);sel=-1;val=null;$('time').textContent='0:00';$('best').textContent=best()?fmt(best()):'-';ov.classList.add('hide');done=false;
+  const id=++rid;$('time').textContent='...';setTimeout(()=>{if(id!==rid)return;clearInterval(tm);[sol,pz]=gen();val=pz.slice();gv=pz.map(v=>!!v);nt=Array(81).fill(0);sel=-1;t0=Date.now();$('time').textContent='0:00';tm=setInterval(()=>$('time').textContent=fmt((Date.now()-t0)/1000|0),1000);render()},20)}
+function conflict(i){const v=val[i];if(!v)return false;const r=i/9|0,c=i%9;for(let j=0;j<81;j++){if(j===i||val[j]!==v)continue;if((j/9|0)===r||j%9===c||((j/9|0)/3|0)===(r/3|0)&&((j%9)/3|0)===(c/3|0))return true}return false}
+function render(){
+  const cnt=Array(10).fill(0);val.forEach(v=>cnt[v]++);[...pad.children].forEach(b=>b.disabled=cnt[b.dataset.n]>=9);
+  const sr=sel>=0?sel/9|0:-1,sc=sel>=0?sel%9:-1,sv=sel>=0?val[sel]:0;
+  [...grid.querySelectorAll('.s')].forEach((el,i)=>{const r=i/9|0,c=i%9;let cls='s';
+    if(c===2||c===5)cls+=' b-r';if(r===2||r===5)cls+=' b-b';
+    if(gv[i])cls+=' g';else if(val[i])cls+=' u';
+    if(sel>=0){if(i===sel)cls+=' sel';else if(sv&&val[i]===sv)cls+=' same';else if(r===sr||c===sc||((r/3|0)===(sr/3|0)&&(c/3|0)===(sc/3|0)))cls+=' peer'}
+    if(conflict(i))cls+=' err';el.className=cls;
+    if(val[i])el.textContent=val[i];else if(nt[i]){el.innerHTML='<div class="nt">'+[1,2,3,4,5,6,7,8,9].map(n=>`<span>${nt[i]&(1<<n)?n:''}</span>`).join('')+'</div>'}else el.textContent=''})}
+function put(n){if(!val||sel<0||gv[sel]||done)return;if(noteMode&&n){if(val[sel])return;nt[sel]^=1<<n}else{val[sel]=n;nt[sel]=0;if(n)clean(sel,n)}render();check()}
+function clean(i,n){const r=i/9|0,c=i%9;for(let j=0;j<81;j++){const rr=j/9|0,cc=j%9;if(rr===r||cc===c||((rr/3|0)===(r/3|0)&&(cc/3|0)===(c/3|0)))nt[j]&=~(1<<n)}}
+function check(){if(val.every((v,i)=>v===sol[i])){done=true;clearInterval(tm);const s=(Date.now()-t0)/1000|0,b=best();if(!b||s<b){try{localStorage.setItem('sdBest'+givens,s)}catch(e){}$('best').textContent=fmt(s)}$('ovp').textContent='Time '+fmt(s);resultTimer=setTimeout(()=>ov.classList.remove('hide'),400)}}
+grid.addEventListener('click',e=>{const c=e.target.closest('.s');if(c&&val&&!done){sel=+c.dataset.i;render()}});
+pad.addEventListener('click',e=>{const b=e.target.closest('button');if(b)put(+b.dataset.n)});
+$('erase').onclick=()=>{if(val&&sel>=0&&!gv[sel]&&!done){val[sel]=0;nt[sel]=0;render()}};
+$('hint').onclick=()=>{if(sel>=0&&!gv[sel]&&!done){val[sel]=sol[sel];nt[sel]=0;clean(sel,sol[sel]);render();check()}};
+const nb=()=>{noteMode=!noteMode;$('notes').textContent='Notes: '+(noteMode?'On':'Off');$('notes').className='btn '+(noteMode?'':'sec')};
+$('notes').onclick=nb;
+addEventListener('keydown',e=>{if(!val||done)return;const k=gameKey(e);if(k>='1'&&k<='9')put(+k);else if(k==='Backspace'||k==='Delete'||k==='0')$('erase').click();else if(k==='n'||k==='N')nb();
+  else if(k.startsWith('Arrow')&&sel>=0){e.preventDefault();const r=sel/9|0,c=sel%9;sel=k==='ArrowUp'?((r+8)%9)*9+c:k==='ArrowDown'?((r+1)%9)*9+c:k==='ArrowLeft'?r*9+(c+8)%9:r*9+(c+1)%9;render()}else if(k.startsWith('Arrow')){e.preventDefault();sel=40;render()}});
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;givens=+b.dataset.g;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));reset()};
+$('newbtn').onclick=reset;$('ovb').onclick=reset;reset();
+</script></body></html>

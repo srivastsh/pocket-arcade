@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hi-Lo</title><link rel="stylesheet" href="shared.css"><link rel="stylesheet" href="cards.css"><style>
+.wrap{--cw:clamp(90px,26vw,128px);position:relative;width:min(92vw,420px);padding:28px 20px;border-radius:var(--r);background:var(--felt);box-shadow:var(--shadow)}
+.cards{display:flex;gap:22px;justify-content:center}.ctrl{display:flex;gap:12px}.ctrl .btn{padding:14px 28px;font-size:17px}.msg{font-weight:600;min-height:24px}
+.card.deal{animation:deal .3s cubic-bezier(.2,.8,.2,1)}@keyframes deal{from{transform:translateY(-40px);opacity:0}}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Hi-Lo</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="stats"><div class="stat"><small>Streak</small><b id="st">0</b></div><div class="stat"><small>Best</small><b id="best">0</b></div></div>
+<div class="wrap"><div class="cards" id="cards"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Wrong call</h2><p></p><button class="btn">Play Again</button></div></div></div>
+<div class="msg" id="msg">Will the next card be higher or lower?</div>
+<div class="ctrl"><button class="btn" id="hi">Higher</button><button class="btn sec" id="lo">Lower</button></div>
+<div class="hint">Aces are high. W or ↑ guesses higher. S or ↓ guesses lower.</div></main><script src="controls.js"></script><script src="common.js"></script><script>
+const SU=['♠','♥','♦','♣'],RK={11:'J',12:'Q',13:'K',14:'A'};let cur,nx,streak=0,best=+ls('bestHilo')||0,over=false,gid=0;const ov=$('ov');
+const rc=()=>({r:2+rnd(13),s:rnd(4)});
+function mk(c,down){const e=document.createElement('div');e.className='card deal'+(c.s===1||c.s===2?' red':'')+(down?' down':'');e.innerHTML=`<span class="tl">${RK[c.r]||c.r}<br>${SU[c.s]}</span><span class="ct">${SU[c.s]}</span>`;return e}
+function show(reveal){const c=$('cards');c.innerHTML='';c.append(mk(cur,false));c.append(mk(nx,!reveal));$('st').textContent=streak;$('best').textContent=best}
+function reset(){gid++;$('hi').disabled=$('lo').disabled=false;cur=rc();nx=rc();streak=0;over=false;ov.classList.add('hide');$('msg').textContent='Will the next card be higher or lower?';show(false)}
+async function guess(h){if(over||$('hi').disabled)return;const id=gid;$('hi').disabled=$('lo').disabled=true;show(true);await sleep(450);if(id!==gid)return;
+  if(nx.r===cur.r){$('msg').textContent='Same rank. No change.'}
+  else if((nx.r>cur.r)===h){streak++;if(streak>best){best=streak;ls('bestHilo',best)}$('msg').textContent='Correct'}
+  else{over=true;$('hi').disabled=$('lo').disabled=false;return overlay(ov,'Wrong call','Streak '+streak,'Play Again',reset)}
+  await sleep(700);if(id!==gid)return;cur=nx;nx=rc();show(false);$('hi').disabled=$('lo').disabled=false}
+$('hi').onclick=()=>guess(true);$('lo').onclick=()=>guess(false);
+bindGameKeys({
+  ArrowUp: event => { if (!event.repeat) guess(true); },
+  ArrowDown: event => { if (!event.repeat) guess(false); }
+});
+$('newbtn').onclick=reset;reset();</script></body></html>

@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Light Cycles</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+.arena {
+  width:min(100%,680px,max(290px,calc((100vh - 258px)*1.5))); aspect-ratio:3/2;
+  position:relative; overflow:hidden; border-radius:var(--r); box-shadow:var(--shadow);
+  background:radial-gradient(ellipse at 8% 12%,rgba(70,179,244,.17),transparent 61%),
+             radial-gradient(ellipse at 98% 88%,rgba(246,140,53,.15),transparent 60%),var(--card);
+}
+canvas { display:block; width:100%; height:100%; touch-action:none; }
+.arena:has(canvas:focus-visible) { outline:3px solid var(--blue); outline-offset:3px; }
+.stat b { font-variant-numeric:tabular-nums; }
+.stat small i { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--blue); margin-right:4px; }
+.stat:last-child small i { background:var(--orange); }
+</style>
+</head>
+<body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Light Cycles</h1><div class="right">
+<button class="btn sec" id="hold" disabled>Pause</button><button class="btn sec" id="newbtn">New Game</button>
+</div></header>
+<main>
+<div class="seg" aria-label="Game mode" role="group">
+<button id="solo" aria-pressed="true" class="on">Solo</button><button id="duel" aria-pressed="false">Two Players</button>
+</div>
+<div class="stats">
+<div class="stat"><small><i></i><span id="name1">You</span></small><b id="score1">0</b></div>
+<div class="stat"><small>Round</small><b id="round">1</b></div>
+<div class="stat"><small><i></i><span id="name2">CPU</span></small><b id="score2">0</b></div>
+</div>
+<div class="arena">
+<canvas id="arena" tabindex="0" role="img" aria-label="Light Cycles arena, blue and orange riders" aria-describedby="hint"></canvas>
+<div class="overlay" id="ov"><div class="game-sheet" role="group" aria-labelledby="title" aria-live="polite">
+<h2 id="title">Light Cycles</h2><p id="detail"></p><button class="btn" id="play">Play</button>
+</div></div>
+</div>
+<p class="hint" id="hint"></p>
+</main>
+<script src="common.js"></script><script src="controls.js"></script><script src="board-colors.js"></script>
+<script>
+const cols = 36, rows = 24, tickMs = 108;
+const directions = [[0,-1],[1,0],[0,1],[-1,0]];
+const keys = ['ArrowUp','ArrowRight','ArrowDown','ArrowLeft'];
+const canvas = $('arena'), ctx = canvas.getContext('2d');
+const occupied = new Uint8Array(cols * rows);
+const scores = [0, 0];
+const swipes = new Map();
+let riders, phase, timer, solo = true, round = 1;
+
+function makeRider(x, y, heading) {
+  const path = [[x - directions[heading][0], y], [x, y]];
+  path.forEach(([cx, cy]) => occupied[cy * cols + cx] = 1);
+  return {x, y, heading, queue:[], path};
+}
+function clearRound() {
+  occupied.fill(0);
+  riders = [makeRider(7, 12, 1), makeRider(28, 12, 3)];
+  swipes.clear();
+  $('round').textContent = round;
+  draw();
+}
+function setPhase(next) {
+  clearTimeout(timer);
+  phase = next;
+  $('hold').disabled = !['playing','paused'].includes(next);
+  $('hold').textContent = next === 'paused' ? 'Resume' : 'Pause';
+}
+function sheet(title, detail, button) {
+  overlay($('ov'), title, detail, button, advance);
+}
+function newMatch() {
+  round = 1;
+  scores.fill(0);
+  $('score1').textContent = $('score2').textContent = 0;
+  setPhase('ready');
+  clearRound();
+  sheet('Light Cycles', 'Leave a trail. Avoid both trails and the walls. The first to win three rounds takes the match.', 'Play');
+}
+function chooseMode(single) {
+  solo = single;
+  for (const [button, selected] of [[$('solo'),solo],[$('duel'),!solo]]) {
+    button.setAttribute('aria-pressed', selected);
+    button.classList.toggle('on', selected);
+  }
+  $('name1').textContent = solo ? 'You' : 'Blue';
+  $('name2').textContent = solo ? 'CPU' : 'Orange';
+  $('hint').textContent = solo ? 'Steer with WASD, arrow keys or a swipe. Space pauses.'
+    : 'Blue uses WASD. Orange uses the arrows. On touch, swipe the left half for blue and the right half for orange. Space pauses.';
+  newMatch();
+}
+function advance() {
+  if (phase === 'playing') return;
+  if (phase === 'finished') newMatch();
+  if (phase === 'between') { round++; clearRound(); }
+  setPhase('playing');
+  $('ov').classList.add('hide');
+  canvas.focus({preventScroll:true});
+  timer = setTimeout(step, tickMs * 2);
+}
+function pause() {
+  if (phase !== 'playing') return;
+  setPhase('paused');
+  riders.forEach(rider => rider.queue.length = 0);
+  swipes.clear();
+  sheet('Paused', 'Continue from the same position.', 'Resume');
+}
+function queueTurn(player, heading) {
+  if (phase !== 'playing') return;
+  const rider = riders[player], headingBefore = rider.queue.at(-1) ?? rider.heading;
+  if (rider.queue.length < 2 && heading % 2 !== headingBefore % 2) rider.queue.push(heading);
+}
+function blocked(x, y) {
+  return x < 0 || x >= cols || y < 0 || y >= rows || occupied[y * cols + x] !== 0;
+}
+function computerHeading() {
+  const cpu = riders[1], other = riders[0];
+  let best = -Infinity, heading = cpu.heading;
+  for (const turn of [0, 3, 1]) {
+    const direction = (cpu.heading + turn) % 4, [dx,dy] = directions[direction];
+    let x = cpu.x + dx, y = cpu.y + dy;
+    if (blocked(x,y)) continue;
+    const nearRival = Math.abs(x-other.x) + Math.abs(y-other.y) === 1;
+    const exits = directions.filter(([a,b]) => !blocked(x+a,y+b)).length;
+    let room = 0;
+    while (room < 8 && !blocked(x,y)) { room++; x+=dx; y+=dy; }
+    const value = room + 1.5*exits + Math.random()*3 + (turn === 0 ? 1 : 0) - (nearRival ? 8 : 0);
+    if (value > best) { best = value; heading = direction; }
+  }
+  return heading;
+}
+function step() {
+  if (phase !== 'playing') return;
+  if (solo) riders[1].heading = computerHeading();
+  const next = riders.map(rider => {
+    rider.heading = rider.queue.shift() ?? rider.heading;
+    const [dx,dy] = directions[rider.heading];
+    return [rider.x+dx, rider.y+dy];
+  });
+  const headOn = next[0][0] === next[1][0] && next[0][1] === next[1][1];
+  const crashed = next.map(([x,y]) => headOn || blocked(x,y));
+  riders.forEach((rider, player) => {
+    if (crashed[player]) return;
+    [rider.x, rider.y] = next[player];
+    rider.path.push(next[player]);
+    occupied[rider.y * cols + rider.x] = 1;
+  });
+  draw(crashed);
+  if (crashed.some(Boolean)) { finishRound(crashed); return; }
+  timer = setTimeout(step, tickMs);
+}
+function finishRound(crashed) {
+  const tie = crashed.every(Boolean), winner = crashed[0] ? 1 : 0;
+  if (!tie) scores[winner]++;
+  $('score1').textContent = scores[0];
+  $('score2').textContent = scores[1];
+  const won = scores[winner] === 3, name = winner === 0 ? $('name1').textContent : $('name2').textContent;
+  const verdict = tie ? 'Round tied' : name + (name === 'You' ? ' win' : ' wins') + (won ? ' the match' : ' the round');
+  setPhase(won ? 'finished' : 'between');
+  sheet(verdict, tie ? 'Both riders crashed. Neither scores.' : 'Blue ' + scores[0] + ' · Orange ' + scores[1], won ? 'Play Again' : 'Next Round');
+}
+
+function fit() {
+  const bounds = canvas.getBoundingClientRect(), scale = devicePixelRatio || 1;
+  canvas.width = Math.max(1,Math.round(bounds.width*scale));
+  canvas.height = Math.max(1,Math.round(bounds.height*scale));
+  draw();
+}
+function draw(crashed = []) {
+  if (!riders) return;
+  ctx.setTransform(canvas.width/cols,0,0,canvas.height/rows,0,0);
+  ctx.clearRect(0,0,cols,rows);
+  ctx.fillStyle = boardColors.line;
+  for (let y = 1; y < rows; y++) for (let x = 1; x < cols; x++)
+    ctx.fillRect(x-.045,y-.045,.09,.09);
+  for (const [i,rider] of riders.entries()) {
+    const color = i === 0 ? boardColors.blue : boardColors.orange;
+    ctx.lineCap = ctx.lineJoin = 'round';
+    ctx.beginPath();
+    rider.path.forEach(([x,y],index) => {
+      if (!index) ctx.moveTo(x+.5,y+.5); else ctx.lineTo(x+.5,y+.5);
+    });
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = .19; ctx.lineWidth = .82; ctx.stroke();
+    ctx.globalAlpha = 1; ctx.lineWidth = .47; ctx.stroke();
+    ctx.save();
+    ctx.translate(rider.x+.5, rider.y+.5);
+    ctx.rotate(rider.heading*Math.PI/2);
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.moveTo(0,-.52); ctx.lineTo(.4,.34); ctx.lineTo(-.4,.34); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = boardColors.text; ctx.lineWidth = .075; ctx.stroke();
+    if (crashed[i]) { ctx.lineWidth = .16; ctx.beginPath(); ctx.arc(0,0,.77,0,Math.PI*2); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+
+window.addEventListener('keydown', event => {
+  const key = gameKey(event);
+  if (!key || event.repeat) return;
+  if (key === ' ' && (phase === 'playing' || !event.target.closest?.('button,a'))) {
+    event.preventDefault();
+    if (phase === 'playing') pause(); else advance();
+    return;
+  }
+  const heading = keys.indexOf(key);
+  if (heading < 0 || phase !== 'playing') return;
+  event.preventDefault();
+  const player = !solo && event.key.startsWith('Arrow') ? 1 : 0;
+  queueTurn(player, heading);
+});
+canvas.addEventListener('pointerdown', event => {
+  if (phase !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  const player = !solo && event.clientX >= rect.left + rect.width/2 ? 1 : 0;
+  swipes.set(event.pointerId, {x:event.clientX, y:event.clientY, player});
+  canvas.setPointerCapture(event.pointerId);
+});
+function readSwipe(event) {
+  const gesture = swipes.get(event.pointerId);
+  if (!gesture) return;
+  const dx = event.clientX-gesture.x, dy = event.clientY-gesture.y;
+  if (Math.max(Math.abs(dx),Math.abs(dy)) < 16) return;
+  queueTurn(gesture.player, Math.abs(dx)>Math.abs(dy) ? (dx>0 ? 1 : 3) : (dy>0 ? 2 : 0));
+  gesture.x = event.clientX;
+  gesture.y = event.clientY;
+}
+canvas.addEventListener('pointermove', readSwipe);
+canvas.addEventListener('pointerup', event => { readSwipe(event); swipes.delete(event.pointerId); });
+canvas.addEventListener('lostpointercapture', event => swipes.delete(event.pointerId));
+canvas.addEventListener('pointercancel', event => swipes.delete(event.pointerId));
+$('solo').onclick = () => { if (!solo) chooseMode(true); };
+$('duel').onclick = () => { if (solo) chooseMode(false); };
+$('newbtn').onclick = newMatch;
+$('hold').onclick = () => { if (phase === 'playing') pause(); else if (phase === 'paused') advance(); };
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+window.addEventListener('blur', pause);
+window.addEventListener('pagehide', pause);
+window.addEventListener('boardcolorschange', () => draw());
+new ResizeObserver(fit).observe(canvas);
+chooseMode(true);
+fit();
+</script>
+</body>
+</html>

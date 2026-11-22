@@ -1,0 +1,52 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pong</title><link rel="stylesheet" href="shared.css">
+<style>
+.board{position:relative;width:min(92vw,680px);aspect-ratio:3/2;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);overflow:hidden;line-height:0;touch-action:none;cursor:none;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+canvas{width:100%;height:100%;display:block}
+.overlay{cursor:default}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Pong</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="seg" id="seg"><button data-s="250">Easy</button><button class="on" data-s="340">Medium</button><button data-s="460">Hard</button></div>
+<div class="stats"><div class="stat"><small>You</small><b id="s1">0</b></div><div class="stat"><small>CPU</small><b id="s2">0</b></div></div>
+<div class="board" id="board"><canvas id="cv"></canvas><div class="overlay" id="ov"><div class="game-sheet" role="group" aria-labelledby="ovt"><h2 id="ovt">Pong</h2><p id="ovp">First to 7 wins. Move with the mouse, touch, W and S or the arrow keys.</p><button class="btn" id="ovb">Play</button></div></div></div>
+<div class="hint">Click, tap or press space to serve.</div>
+</main>
+<script src="board-colors.js"></script><script src="controls.js"></script><script>
+if(window.CanvasRenderingContext2D&&!CanvasRenderingContext2D.prototype.roundRect)CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){r=Array.isArray(r)?r[0]:r;r=Math.max(0,Math.min(+r||0,Math.abs(w)/2,Math.abs(h)/2));this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath()};
+const $=id=>document.getElementById(id),cv=$('cv'),ctx=cv.getContext('2d'),ov=$('ov');
+const W=600,H=400,dpr=Math.min(devicePixelRatio||1,3);cv.width=W*dpr;cv.height=H*dpr;ctx.scale(dpr,dpr);
+const PH=76,PWD=12,BR=8,MX=22;
+let ai=340,py,ay,bx,by,vx,vy,sp,sc,state='idle',last=0,srv=1;
+function reset(){py=ay=H/2;sc=[0,0];$('s1').textContent=$('s2').textContent=0;ov.classList.add('hide');serve(1)}
+function serve(d){srv=d;bx=W/2;by=H/2;vx=vy=0;sp=ai;state='ready'}
+function launch(){if(state!=='ready')return;const a=(Math.random()*40-20)*Math.PI/180;vx=Math.cos(a)*sp*srv;vy=Math.sin(a)*sp;state='run'}
+function pt(i){sc[i]++;$('s'+(i+1)).textContent=sc[i];if(sc[i]>=7){state='over';$('ovt').textContent=i?'CPU wins':'You win';$('ovp').textContent=sc[0]+' to '+sc[1];$('ovb').textContent='Play Again';ov.classList.remove('hide')}else serve(i?1:-1)}
+function bounce(py2,dir){const o=Math.max(-1,Math.min(1,(by-py2)/(PH/2)));sp=Math.min(sp+22,Math.max(ai*1.9,420));const a=o*55*Math.PI/180;vx=Math.cos(a)*sp*dir;vy=Math.sin(a)*sp}
+function frame(t){const dt=Math.min((t-(last||t))/1000,.033);last=t;
+  if(held('ArrowUp'))py-=480*dt;if(held('ArrowDown'))py+=480*dt;py=Math.max(PH/2,Math.min(H-PH/2,py));
+  if(state==='run'||state==='ready'){const tg=state==='run'&&vx>0?by:H/2,sp2=ai*.9;const d=tg-ay;ay+=Math.max(-sp2*dt,Math.min(sp2*dt,d));ay=Math.max(PH/2,Math.min(H-PH/2,ay))}
+  if(state==='ready')by=H/2;
+  if(state==='run'){for(let i=0;i<2;i++){bx+=vx*dt/2;by+=vy*dt/2;
+    if(by<BR){by=BR;vy=Math.abs(vy)}if(by>H-BR){by=H-BR;vy=-Math.abs(vy)}
+    if(vx<0&&bx-BR<=MX+PWD&&bx>MX&&Math.abs(by-py)<=PH/2+BR){bx=MX+PWD+BR;bounce(py,1)}
+    if(vx>0&&bx+BR>=W-MX-PWD&&bx<W-MX&&Math.abs(by-ay)<=PH/2+BR){bx=W-MX-PWD-BR;bounce(ay,-1)}
+    if(bx<-BR){pt(1);break}if(bx>W+BR){pt(0);break}}}
+  draw();requestAnimationFrame(frame)}
+function rr(x,y,w,h,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function draw(){ctx.clearRect(0,0,W,H);const tx=boardColors.text;
+  ctx.fillStyle=boardColors.line;for(let y=10;y<H;y+=28)ctx.fillRect(W/2-1.5,y,3,14);
+  rr(MX,py-PH/2,PWD,PH,6,tx);rr(W-MX-PWD,ay-PH/2,PWD,PH,6,boardColors.blue);
+  ctx.fillStyle=boardColors.red;ctx.beginPath();ctx.arc(bx,by,BR,0,7);ctx.fill()}
+const b=$('board');function mv(e){const r=cv.getBoundingClientRect();py=(e.clientY-r.top)/r.height*H}
+b.addEventListener('pointermove',mv);b.addEventListener('pointerdown',e=>{mv(e);launch()});
+const held = bindGameKeys({
+  ArrowUp: null, ArrowDown: null,
+  ' ': event => {
+    if (event.repeat) return;
+    if (state === 'idle' || state === 'over') reset();
+    launch();
+  }
+});
+$('seg').onclick=e=>{const x=e.target.closest('button');if(!x)return;ai=+x.dataset.s;[...$('seg').children].forEach(y=>y.classList.toggle('on',y===x));reset()};
+$('ovb').onclick=reset;$('newbtn').onclick=reset;reset();state='idle';ov.classList.remove('hide');requestAnimationFrame(frame);
+</script></body></html>

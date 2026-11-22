@@ -1,0 +1,26 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pegs</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;width:min(92vw,440px);padding:16px;border-radius:var(--r);background:linear-gradient(160deg,#c9955a,#9a6a38);box-shadow:var(--shadow)}
+.b{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.h{aspect-ratio:1;border:0;padding:0;border-radius:50%;background:transparent;position:relative;cursor:pointer}
+.h.v{background:radial-gradient(circle,rgba(0,0,0,.45) 0 35%,rgba(0,0,0,.12) 36%)}
+.h.p::after{content:"";position:absolute;inset:8%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#7fc0ff,#0a6fe0);box-shadow:0 3px 5px rgba(0,0,0,.4)}
+.h.s::after{background:radial-gradient(circle at 35% 30%,#ffe98a,#ffb300)}
+.h.t{outline:3px solid #fff;outline-offset:-6px}.ctrl{display:flex}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Pegs</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="stats"><div class="stat"><small>Pegs left</small><b id="left">32</b></div><div class="stat"><small>Best</small><b id="best">-</b></div></div>
+<div class="wrap"><div class="b" id="b"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title"></h2><p></p><button class="btn">Play Again</button></div></div></div>
+<div class="ctrl"><button class="btn sec" id="undo">Undo</button></div>
+<div class="hint">Jump a peg over a neighbor into an empty hole. Leave just one. Use WASD or arrows to choose a hole. Return selects a peg or landing spot.</div></main><script src="controls.js"></script><script src="common.js"></script><script>
+const V=(r,c)=>!((r<2||r>4)&&(c<2||c>4));let g,sel,hist,over;const bd=$('b'),ov=$('ov');
+for(let i=0;i<49;i++){const b=document.createElement('button');b.className='h';b.dataset.i=i;b.setAttribute('aria-label','Hole '+(i+1));if(!V(i/7|0,i%7)){b.style.visibility='hidden';b.tabIndex=-1}bd.append(b)}
+const bestK='pegBest';
+let resultTimer;
+function reset(){clearTimeout(resultTimer);g=Array.from({length:7},(_,r)=>Array.from({length:7},(_,c)=>V(r,c)?1:-1));g[3][3]=0;sel=null;hist=[];over=false;ov.classList.add('hide');$('best').textContent=ls(bestK)||'-';render()}
+function tg(r,c){const o=[];for(const[dr,dc]of[[0,1],[1,0],[0,-1],[-1,0]]){const r2=r+2*dr,c2=c+2*dc;if(r2>=0&&r2<7&&c2>=0&&c2<7&&g[r2][c2]===0&&g[r+dr][c+dc]===1)o.push([r2,c2,r+dr,c+dc])}return o}
+function render(){const ts=sel?tg(...sel):[];[...bd.children].forEach((b,i)=>{const r=i/7|0,c=i%7,v=g[r][c];b.className='h'+(v>=0?' v':'')+(v===1?' p':'')+(sel&&sel[0]===r&&sel[1]===c?' s':'')+(ts.some(t=>t[0]===r&&t[1]===c)?' t':'')});let n=0;g.forEach(r=>r.forEach(v=>{if(v===1)n++}));$('left').textContent=n;return n}
+function anyMove(){for(let r=0;r<7;r++)for(let c=0;c<7;c++)if(g[r][c]===1&&tg(r,c).length)return true;return false}
+bd.addEventListener('click',e=>{const b=e.target.closest('.h');if(!b||over)return;const i=+b.dataset.i,r=i/7|0,c=i%7;
+  if(sel){const t=tg(...sel).find(t=>t[0]===r&&t[1]===c);if(t){hist.push(JSON.stringify(g));g[sel[0]][sel[1]]=0;g[t[2]][t[3]]=0;g[r][c]=1;sel=null;const n=render();if(n===1||!anyMove()){over=true;const k=+ls(bestK);if(!k||n<k){ls(bestK,n);$('best').textContent=n}resultTimer=setTimeout(()=>overlay(ov,n===1?(g[3][3]===1?'Perfect':'Solved'):'No moves left',n===1?'One peg remains':n+' pegs remain','Play Again',reset),300)}return}}
+  sel=g[r][c]===1?[r,c]:null;render()});
+$('undo').onclick=()=>{if(hist.length&&!over){g=JSON.parse(hist.pop());sel=null;render()}};$('newbtn').onclick=reset;reset();
+enableGridNavigation(bd, '.h', () => !over);
+</script></body></html>

@@ -1,0 +1,76 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Snake</title><link rel="stylesheet" href="shared.css">
+<style>
+.board{position:relative;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);overflow:hidden;touch-action:none;line-height:0}
+canvas{display:block}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Snake</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="stats"><div class="stat"><small>Score</small><b id="score">0</b></div><div class="stat"><small>Best</small><b id="best">0</b></div></div>
+<div class="board" id="board"><canvas id="cv"></canvas><div class="overlay" id="ov"><div class="game-sheet" role="group" aria-labelledby="ovt"><h2 id="ovt">Snake</h2><p id="ovp">Use WASD, an arrow key or a swipe to start.</p><button class="btn" id="ovb">Play</button></div></div></div>
+<div class="hint">Arrow keys, WASD or swipe. Space pauses.</div>
+</main>
+<script src="board-colors.js"></script><script src="controls.js"></script><script>
+if(window.CanvasRenderingContext2D&&!CanvasRenderingContext2D.prototype.roundRect)CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){r=Array.isArray(r)?r[0]:r;r=Math.max(0,Math.min(+r||0,Math.abs(w)/2,Math.abs(h)/2));this.moveTo(x+r,y);this.arcTo(x+w,y,x+w,y+h,r);this.arcTo(x+w,y+h,x,y+h,r);this.arcTo(x,y+h,x,y,r);this.arcTo(x,y,x+w,y,r);this.closePath()};
+const $=id=>document.getElementById(id),cv=$('cv'),ctx=cv.getContext('2d'),ov=$('ov');
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+const G=20;let S,snake,dir,q,apple,score,best=+ls('bestSnake')||0,state,timer;
+function fit(){const w=Math.min(innerWidth*.92,480),d=devicePixelRatio||1;cv.style.width=cv.style.height=w+'px';cv.width=cv.height=Math.round(w*d);S=cv.width/G;if(snake)draw()}
+function reset(){clearTimeout(timer);snake=[{x:8,y:10},{x:7,y:10},{x:6,y:10}];dir={x:1,y:0};q=[];score=0;spawn();state='idle';$('score').textContent=0;$('best').textContent=best;$('ovt').textContent='Snake';$('ovp').textContent='Use WASD, an arrow key or a swipe to start.';$('ovb').textContent='Play';ov.classList.remove('hide');draw()}
+function spawn(){if(snake.length>=G*G){apple=null;return}do{apple={x:Math.random()*G|0,y:Math.random()*G|0}}while(snake.some(s=>s.x===apple.x&&s.y===apple.y))}
+function start(){if(state==='run')return;state='run';ov.classList.add('hide');loop()}
+function loop(){tick();if(state==='run')timer=setTimeout(loop,Math.max(62,125-score*2.5))}
+function finish(title) {
+  state='dead'; ov.classList.remove('hide');
+  $('ovt').textContent=title; $('ovp').textContent='Score '+score; $('ovb').textContent='Play Again';
+}
+function tick(){
+  if(q.length)dir=q.shift();
+  const h={x:snake[0].x+dir.x,y:snake[0].y+dir.y},eat=h.x===apple.x&&h.y===apple.y;
+  const body=eat?snake:snake.slice(0,-1);
+  if(h.x<0||h.y<0||h.x>=G||h.y>=G||body.some(s=>s.x===h.x&&s.y===h.y)){finish('Game Over');return}
+  snake.unshift(h);
+  if(eat){score++;$('score').textContent=score;if(score>best){best=score;ls('bestSnake',best);$('best').textContent=best}spawn();if(!apple)finish('Board cleared')}else snake.pop();
+  draw();
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()}
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle=boardColors.cell;
+  for(let y=0;y<G;y++)for(let x=0;x<G;x++)if((x+y)%2)ctx.fillRect(x*S,y*S,S,S);
+  const a=apple,p=S*.12;
+  if(a){ctx.fillStyle=boardColors.red;ctx.beginPath();ctx.arc((a.x+.5)*S,(a.y+.56)*S,S*.36,0,7);ctx.fill();
+  ctx.fillStyle=boardColors.green;ctx.beginPath();ctx.ellipse((a.x+.62)*S,(a.y+.18)*S,S*.12,S*.07,-.6,0,7);ctx.fill()}
+  const n=snake.length;
+  for(let i=n-1;i>=0;i--){const s=snake[i],t=i/Math.max(n-1,1);
+    ctx.fillStyle=boardColors.green;ctx.globalAlpha=1-.22*t;
+    const j=snake[i-1];
+    rr(s.x*S+p,s.y*S+p,S-2*p,S-2*p,S*.3);
+    if(j)ctx.fillRect(Math.min(s.x,j.x)*S+p,Math.min(s.y,j.y)*S+p,(s.x!==j.x?S*2-2*p:S-2*p),(s.y!==j.y?S*2-2*p:S-2*p))
+  }
+  const h=snake[0];ctx.globalAlpha=1;ctx.fillStyle='#fff';
+  for(let k=0;k<2;k++){const cx=dir.y?[.3,.7][k]:.5+dir.x*.2,cy=dir.x?[.3,.7][k]:.5+dir.y*.2;ctx.beginPath();ctx.arc((h.x+cx)*S,(h.y+cy)*S,S*.11,0,7);ctx.fill()}
+  ctx.fillStyle='#1c1c1e';
+  for(let k=0;k<2;k++){const cx=dir.y?[.3,.7][k]:.5+dir.x*.24,cy=dir.x?[.3,.7][k]:.5+dir.y*.24;ctx.beginPath();ctx.arc((h.x+cx)*S,(h.y+cy)*S,S*.05,0,7);ctx.fill()}
+}
+function turn(x,y){
+  if(state==='dead')return;
+  const l=q.length?q[q.length-1]:dir;
+  if(!((l.x===x&&l.y===y)||(l.x===-x&&l.y===-y))&&q.length<2)q.push({x,y});
+  if(state==='idle'||state==='pause')start();
+}
+function pause(){if(state==='run'){state='pause';clearTimeout(timer);$('ovt').textContent='Paused';$('ovp').textContent='Press space to resume';$('ovb').textContent='Resume';ov.classList.remove('hide')}}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)pause()});
+bindGameKeys({
+  ArrowLeft: () => turn(-1, 0), ArrowRight: () => turn(1, 0),
+  ArrowUp: () => turn(0, -1), ArrowDown: () => turn(0, 1),
+  ' ': event => {
+    if (event.repeat) return;
+    if (state === 'run') pause();
+    else { if (state === 'dead') reset(); start(); }
+  }
+});
+let sx,sy;const b=$('board');b.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY});
+b.addEventListener('pointercancel',()=>sx=null);b.addEventListener('pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=null;if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;Math.abs(dx)>Math.abs(dy)?turn(dx<0?-1:1,0):turn(0,dy<0?-1:1)});
+$('ovb').onclick=()=>{if(state==='dead')reset();if(state==='idle')q.length=0;start()};
+$('newbtn').onclick=reset;addEventListener('boardcolorschange',draw);addEventListener('resize',fit);fit();reset();
+</script></body></html>

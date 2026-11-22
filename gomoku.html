@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Gomoku</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;border-radius:var(--r);background:var(--wood);box-shadow:var(--shadow);overflow:hidden;line-height:0;cursor:pointer}
+canvas{display:block}.msg{font-weight:600;min-height:24px}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Gomoku</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="seg" id="seg"><button data-e="1">Easy</button><button class="on" data-e="0">Hard</button></div>
+<div class="stats"><div class="stat"><small>You</small><b id="s1">0</b></div><div class="stat"><small>CPU</small><b id="s2">0</b></div></div>
+<div class="msg" id="msg">Five in a row wins. You play black.</div>
+<div class="wrap"><canvas id="cv"></canvas><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title"></h2><p></p><button class="btn">Play Again</button></div></div></div>
+<div class="ctrl"><button class="btn sec" id="undo">Undo</button></div></main><script src="board-colors.js"></script><script src="common.js"></script><script>
+const N=15,cv=$('cv'),ctx=cv.getContext('2d'),ov=$('ov');let b,s,over,easy=false,hist,line,sc=[0,0],busy,aiT;
+function fit(){const w=Math.max(240,Math.min(innerWidth*.92,560,innerHeight-300)),d=devicePixelRatio||1;s=w/N;cv.style.width=cv.style.height=w+'px';cv.width=cv.height=Math.round(w*d);ctx.setTransform(d*(cv.width/d/w),0,0,d*(cv.width/d/w),0,0);if(b)draw()}
+function reset(){clearTimeout(aiT);b=Array.from({length:N},()=>Array(N).fill(0));over=false;hist=[];line=null;busy=false;ov.classList.add('hide');$('msg').textContent='Five in a row wins. You play black.';fit()}
+function draw(){const W=s*N;ctx.clearRect(0,0,W,W);ctx.strokeStyle='rgba(60,40,20,.7)';ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<N;i++){const p=(i+.5)*s;ctx.moveTo(.5*s,p);ctx.lineTo((N-.5)*s,p);ctx.moveTo(p,.5*s);ctx.lineTo(p,(N-.5)*s)}ctx.stroke();
+  ctx.fillStyle='rgba(60,40,20,.8)';for(const[r,c]of[[3,3],[3,11],[11,3],[11,11],[7,7]]){ctx.beginPath();ctx.arc((c+.5)*s,(r+.5)*s,s*.1,0,7);ctx.fill()}
+  for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(b[r][c]){const x=(c+.5)*s,y=(r+.5)*s,g=ctx.createRadialGradient(x-s*.12,y-s*.12,s*.04,x,y,s*.42);if(b[r][c]===1){g.addColorStop(0,'#6a6a6e');g.addColorStop(1,'#111')}else{g.addColorStop(0,'#fff');g.addColorStop(1,'#cfcfd6')}ctx.fillStyle=g;ctx.shadowColor='rgba(0,0,0,.35)';ctx.shadowBlur=s*.04;ctx.shadowOffsetY=s*.03;ctx.beginPath();ctx.arc(x,y,s*.42,0,7);ctx.fill();ctx.shadowColor='transparent'}
+  const l=hist[hist.length-1];if(l){ctx.strokeStyle=boardColors.red;ctx.lineWidth=2;ctx.beginPath();ctx.arc((l[1]+.5)*s,(l[0]+.5)*s,s*.16,0,7);ctx.stroke()}
+  if(line){ctx.strokeStyle=boardColors.green;ctx.lineWidth=s*.12;ctx.lineCap='round';ctx.beginPath();ctx.moveTo((line[0][1]+.5)*s,(line[0][0]+.5)*s);ctx.lineTo((line[1][1]+.5)*s,(line[1][0]+.5)*s);ctx.stroke()}}
+const D4=[[0,1],[1,0],[1,1],[1,-1]];
+function run(r,c,dr,dc,p){let n=1,open=0;for(const sg of[1,-1]){let rr=r+dr*sg,cc=c+dc*sg;while(rr>=0&&rr<N&&cc>=0&&cc<N&&b[rr][cc]===p){n++;rr+=dr*sg;cc+=dc*sg}if(rr>=0&&rr<N&&cc>=0&&cc<N&&b[rr][cc]===0)open++}return[n,open]}
+function win(r,c,p){for(const[dr,dc]of D4){const[n]=run(r,c,dr,dc,p);if(n>=5){let a=[r,c],z=[r,c];while(a[0]-dr>=0&&a[0]-dr<N&&a[1]-dc>=0&&a[1]-dc<N&&b[a[0]-dr][a[1]-dc]===p)a=[a[0]-dr,a[1]-dc];while(z[0]+dr>=0&&z[0]+dr<N&&z[1]+dc>=0&&z[1]+dc<N&&b[z[0]+dr][z[1]+dc]===p)z=[z[0]+dr,z[1]+dc];return[a,z]}}return null}
+const TB=(n,o)=>n>=5?1e6:n===4?(o===2?1e5:o===1?1e4:0):n===3?(o===2?5e3:o===1?500:0):n===2?(o===2?200:o===1?20:0):(o?2:0);
+function val(r,c,p){let t=0;for(const[dr,dc]of D4){const[n,o]=run(r,c,dr,dc,p);t+=TB(n,o)}return t}
+function ai(){const cand=[];let any=false;for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(b[r][c])any=true;
+  if(!any)return[7,7];for(let r=0;r<N;r++)for(let c=0;c<N;c++){if(b[r][c])continue;let near=false;for(let i=-2;i<=2&&!near;i++)for(let j=-2;j<=2;j++){const rr=r+i,cc=c+j;if(rr>=0&&rr<N&&cc>=0&&cc<N&&b[rr][cc]){near=true;break}}if(near)cand.push([r,c,val(r,c,2)*1.05+val(r,c,1)-Math.hypot(r-7,c-7)])}
+  cand.sort((x,y)=>y[2]-x[2]);const pick=easy&&Math.random()<.5?cand[rnd(Math.min(4,cand.length))]:cand[0];return[pick[0],pick[1]]}
+function place(r,c,p){b[r][c]=p;hist.push([r,c,p]);const w=win(r,c,p);if(w){line=w;over=true;sc[p-1]++;$('s'+p).textContent=sc[p-1];draw();overlay(ov,p===1?'You win':'CPU wins','','Play Again',reset);return true}if(hist.length>=N*N){over=true;draw();overlay(ov,'Draw','','Play Again',reset);return true}return false}
+cv.addEventListener('pointerdown',e=>{if(over||busy)return;const rc=cv.getBoundingClientRect(),c=Math.floor((e.clientX-rc.left)/rc.width*N),r=Math.floor((e.clientY-rc.top)/rc.height*N);if(r<0||c<0||r>=N||c>=N||b[r][c])return;
+  if(place(r,c,1))return;draw();busy=true;$('msg').textContent='CPU is thinking';aiT=setTimeout(()=>{$('msg').textContent='Five in a row wins. You play black.';const[a,z]=ai();place(a,z,2);draw();busy=false},250)});
+$('undo').onclick=()=>{if(busy||over||hist.length<2)return;for(let i=0;i<2;i++){const[r,c]=hist.pop();b[r][c]=0}draw()};
+$('seg').onclick=e=>{const x=e.target.closest('button');if(!x)return;easy=x.dataset.e==='1';[...$('seg').children].forEach(y=>y.classList.toggle('on',y===x))};
+addEventListener('boardcolorschange',draw);addEventListener('resize',fit);$('newbtn').onclick=reset;reset();</script></body></html>

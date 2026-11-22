@@ -1,0 +1,25 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hangman</title><link rel="stylesheet" href="shared.css"><style>
+#gal{width:min(56vw,230px);color:var(--text)}
+#wd{display:flex;gap:clamp(4px,1.6vw,8px);flex-wrap:wrap;justify-content:center}
+#wd span{width:clamp(22px,7.2vw,34px);height:44px;border-bottom:4px solid var(--text);font-size:clamp(22px,6.6vw,32px);font-weight:700;text-align:center;text-transform:uppercase}
+#wd span.m{color:var(--red)}
+.kb{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;width:min(92vw,460px)}
+.kb button{width:44px;height:48px;border:0;border-radius:10px;background:var(--card);box-shadow:var(--shadow);font-size:17px;font-weight:600;text-transform:uppercase;color:var(--text);cursor:pointer}
+.kb button:disabled{opacity:.28}.kb button.bad{color:var(--red)}.kb button.good{color:var(--green)}
+.msg{font-size:20px;font-weight:700;min-height:28px}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Hangman</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header><main>
+<div class="stats"><div class="stat"><small>Won</small><b id="w">0</b></div><div class="stat"><small>Lost</small><b id="l">0</b></div></div>
+<svg id="gal" viewBox="0 0 200 210" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"><path d="M20 202h100M50 202V20h80v26" opacity=".5"/><circle data-p cx="130" cy="62" r="16"/><path data-p d="M130 78v48"/><path data-p d="M130 92l-22 20"/><path data-p d="M130 92l22 20"/><path data-p d="M130 126l-20 36"/><path data-p d="M130 126l20 36"/></svg>
+<div id="wd"></div><div class="msg" id="msg"></div><div class="kb" id="kb"></div></main><script src="common.js"></script><script>
+const WORDS="keyboard planet jungle bridge silver mountain library whisper cinnamon orchard lantern compass harvest thunder crystal horizon journey blanket pumpkin balance captain diamond eclipse feather glacier hammock island jacket kitchen lemonade machine network octopus penguin quantum rainbow sandwich tornado umbrella village waffle yogurt zeppelin avocado bicycle cabinet dolphin elephant firefly giraffe harmony jigsaw kangaroo lighthouse mosaic nebula origami pyramid rocket saddle tunnel unicorn volcano walnut".split(' ');
+let w,gs,wrong,over,S={w:0,l:0};try{S=Object.assign(S,JSON.parse(ls('hmStats')||'{}'))}catch(e){}
+const kb=$('kb');for(const c of 'abcdefghijklmnopqrstuvwxyz'){const b=document.createElement('button');b.textContent=c;b.dataset.c=c;kb.append(b)}
+function reset(){w=WORDS[rnd(WORDS.length)];gs=new Set();wrong=0;over=false;$('msg').textContent='';render()}
+function render(){$('wd').innerHTML=[...w].map(c=>`<span class="${over&&!gs.has(c)?'m':''}">${gs.has(c)||over?c:''}</span>`).join('');
+  document.querySelectorAll('[data-p]').forEach((p,i)=>p.style.display=i<wrong?'':'none');
+  kb.querySelectorAll('button').forEach(b=>{const c=b.dataset.c;b.disabled=over||gs.has(c);b.className=gs.has(c)?(w.includes(c)?'good':'bad'):''});$('w').textContent=S.w;$('l').textContent=S.l}
+function guess(c){if(over||gs.has(c))return;gs.add(c);if(!w.includes(c))wrong++;
+  if([...w].every(x=>gs.has(x))){over=true;S.w++;$('msg').textContent='You got it';ls('hmStats',JSON.stringify(S))}
+  else if(wrong>=6){over=true;S.l++;$('msg').textContent='The word was '+w;ls('hmStats',JSON.stringify(S))}render()}
+kb.onclick=e=>{const b=e.target.closest('button');if(b)guess(b.dataset.c)};
+addEventListener('keydown',e=>{if(/^[a-z]$/i.test(e.key)&&!e.metaKey&&!e.ctrlKey)guess(e.key.toLowerCase())});
+$('newbtn').onclick=reset;reset();</script></body></html>

@@ -1,0 +1,70 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Minesweeper</title><link rel="stylesheet" href="shared.css">
+<style>
+.wrap{position:relative;padding:10px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.grid{display:grid;gap:3px;width:min(88vw,var(--w))}
+.c{aspect-ratio:1;border:0;padding:0;border-radius:7px;background:var(--solid);box-shadow:0 1px 2px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.25);font-size:clamp(11px,2.6vw,18px);font-weight:700;display:grid;place-items:center;cursor:pointer;transition:transform .08s,background .15s;color:var(--text)}
+.c:active:not(.o){transform:scale(.92)}
+.c.o{background:var(--cell);box-shadow:none;cursor:default}
+.c.x{background:var(--red)}
+.c.wf{opacity:.55}
+.grid{-webkit-touch-callout:none}
+.n1{color:#0a84ff}.n2{color:#30d158}.n3{color:#ff453a}.n4{color:#bf5af2}.n5{color:#ff9f0a}.n6{color:#32ade6}.n7{color:var(--text)}.n8{color:var(--sub)}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Minesweeper</h1><div class="right"><button class="btn sec" id="flag" aria-pressed="false">Flag</button><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="seg" id="seg"><button class="on" data-l="0">Easy</button><button data-l="1">Medium</button><button data-l="2">Hard</button></div>
+<div class="stats"><div class="stat"><small>Mines</small><b id="mines">10</b></div><div class="stat"><small>Time</small><b id="time">0</b></div></div>
+<div class="wrap" id="wrap"><div class="grid" id="grid"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="ovt"><h2 id="ovt"></h2><p id="ovp"></p><button class="btn" id="ovb">Play Again</button></div></div></div>
+<div class="hint">Click to reveal. Right-click, long-press or use Flag mode to flag. Click a number to clear around it. Move with WASD or arrows. Enter reveals a cell. F flags it.</div>
+</main>
+<script src="controls.js"></script><script>
+const $=id=>document.getElementById(id);
+const LV=[[9,9,10],[16,16,40],[16,24,70]];let lv=0,R,C,M,cells,first,over,flags,t0,tm,open;
+const grid=$('grid'),ov=$('ov');
+function nb(i){const r=i/C|0,c=i%C,o=[];for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){if(!a&&!b)continue;const rr=r+a,cc=c+b;if(rr>=0&&rr<R&&cc>=0&&cc<C)o.push(rr*C+cc)}return o}
+let resultTimer;
+function reset(){clearTimeout(resultTimer);clearInterval(tm);[R,C,M]=LV[lv];if(lv===2&&innerWidth<640)[R,C]=[C,R];cells=Array.from({length:R*C},()=>({m:0,n:0,o:0,f:0}));first=true;over=false;flags=0;open=0;
+  grid.style.setProperty('--w',C*38+'px');grid.style.gridTemplateColumns=`repeat(${C},1fr)`;grid.innerHTML='';
+  cells.forEach((_,i)=>{const b=document.createElement('button');b.className='c';b.dataset.i=i;b.setAttribute('aria-label','Row '+(Math.floor(i/C)+1)+', column '+(i%C+1)+', covered');grid.append(b)});
+  $('mines').textContent=M;$('time').textContent=0;ov.classList.add('hide')}
+function place(safe){const bad=new Set([safe,...nb(safe)]);let k=0;while(k<M){const i=Math.random()*R*C|0;if(bad.has(i)||cells[i].m)continue;cells[i].m=1;k++}
+  cells.forEach((c,i)=>c.n=nb(i).filter(j=>cells[j].m).length)}
+function paint(i){const c=cells[i],el=grid.children[i];el.className='c'+(c.o?' o':'');el.textContent='';
+  if(c.o&&!c.m&&c.n){el.textContent=c.n;el.classList.add('n'+c.n)}
+  else if(c.f&&!c.o)el.textContent='🚩';else if(c.o&&c.m)el.textContent='💣';
+  const state=c.o?(c.m?'mine':c.n?c.n+' adjacent mines':'empty'):c.f?'flagged':'covered';
+  el.setAttribute('aria-label','Row '+(Math.floor(i/C)+1)+', column '+(i%C+1)+', '+state)}
+function reveal(i){
+  const st=[i];while(st.length){const j=st.pop(),c=cells[j];if(c.o||c.f)continue;c.o=1;open++;paint(j);if(!c.n&&!c.m)nb(j).forEach(k=>st.push(k))}}
+function lose(i){over=true;clearInterval(tm);cells.forEach((c,k)=>{if(c.m&&!c.f){c.o=1;paint(k)}else if(c.f&&!c.m)grid.children[k].classList.add('wf')});grid.children[i].classList.add('x');
+  resultTimer=setTimeout(()=>end('Game Over','Hit a mine.'),600)}
+function end(t,p){$('ovt').textContent=t;$('ovp').textContent=p;ov.classList.remove('hide')}
+function act(i){
+  const c=cells[i];if(over)return;
+  if(c.o){if(!c.n)return;const n=nb(i),f=n.filter(j=>cells[j].f).length;if(f!==c.n)return;
+    for(const j of n){if(!cells[j].f&&!cells[j].o){if(cells[j].m){reveal(j);return lose(j)}reveal(j)}}check();return}
+  if(c.f)return;
+  if(first){first=false;place(i);t0=Date.now();tm=setInterval(()=>$('time').textContent=(Date.now()-t0)/1000|0,500)}
+  if(c.m){c.o=1;paint(i);return lose(i)}
+  reveal(i);check()}
+function check(){if(open===R*C-M){over=true;clearInterval(tm);cells.forEach((c,k)=>{if(c.m){c.f=1;paint(k)}});$('mines').textContent=0;const s=(Date.now()-t0)/1000|0;
+  const key='msBest'+lv;let b;try{b=+localStorage.getItem(key)||0}catch(e){}if(!b||s<b){try{localStorage.setItem(key,s)}catch(e){}b=s}
+  resultTimer=setTimeout(()=>end('You Win',`${s}s. Best ${b}s.`),500)}}
+function flag(i){const c=cells[i];if(over||c.o)return;c.f=!c.f;flags+=c.f?1:-1;$('mines').textContent=M-flags;paint(i)}
+let fm=false,lp=false,lt,lx,ly;
+grid.addEventListener('pointerdown',e=>{lp=false;clearTimeout(lt);const b=e.target.closest('.c');if(!b||e.pointerType!=='touch')return;lx=e.clientX;ly=e.clientY;lt=setTimeout(()=>{lp=true;flag(+b.dataset.i);navigator.vibrate&&navigator.vibrate(10)},380)});
+['pointerup','pointercancel'].forEach(ev=>grid.addEventListener(ev,()=>clearTimeout(lt)));
+grid.addEventListener('pointermove',e=>{if(Math.hypot(e.clientX-lx,e.clientY-ly)>10)clearTimeout(lt)});
+grid.addEventListener('click',e=>{const b=e.target.closest('.c');if(!b)return;if(lp){lp=false;return}fm?flag(+b.dataset.i):act(+b.dataset.i)});
+grid.addEventListener('contextmenu',e=>{e.preventDefault();const b=e.target.closest('.c');if(!b)return;if(lp){return}flag(+b.dataset.i)});
+$('flag').onclick=e=>{fm=!fm;e.currentTarget.classList.toggle('on',fm);e.currentTarget.classList.toggle('sec',!fm);e.currentTarget.setAttribute('aria-pressed',fm)};
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;lv=+b.dataset.l;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));reset()};
+$('newbtn').onclick=reset;$('ovb').onclick=reset;reset();
+
+window.addEventListener('keydown', event => {
+  if (gameKey(event) !== 'f' || over || !event.target.matches?.('#grid .c')) return;
+  event.preventDefault();
+  if (!event.repeat) flag(+event.target.dataset.i);
+});
+enableGridNavigation(grid, '.c', () => !over);
+</script></body></html>

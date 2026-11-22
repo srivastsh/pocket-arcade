@@ -1,0 +1,16 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Color</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;width:min(92vw,440px);height:200px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);display:grid;place-items:center}
+.w{font-size:clamp(48px,14vw,76px);font-weight:800;letter-spacing:-.03em}
+.bt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(92vw,440px)}
+.bt button{padding:16px 0;border:0;border-radius:14px;background:var(--card);box-shadow:var(--shadow);font-size:17px;font-weight:600;color:var(--text);cursor:pointer}.bt button:active{transform:scale(.95)}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Color</h1><div class="right"><button class="btn sec" id="newbtn">Start</button></div></header><main>
+<div class="stats"><div class="stat"><small>Time</small><b id="time">30</b></div><div class="stat"><small>Score</small><b id="score">0</b></div><div class="stat"><small>Best</small><b id="best">0</b></div></div>
+<div class="wrap"><div class="w" id="w">Ready</div><div class="overlay" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Color</h2><p>Tap the name of the color the word is written in, not the word itself.</p><button class="btn">Play</button></div></div></div>
+<div class="bt" id="bt"></div>
+<div class="hint">Keys 1 to 6 match the buttons in order.</div></main><script src="common.js"></script><script>
+const C=[['Red','#ff453a'],['Orange','#ff9f0a'],['Yellow','#d9a400'],['Green','#30d158'],['Blue','#0a84ff'],['Purple','#bf5af2']];let sc,t,run,ink,tm,best=+ls('bestColor')||0;const ov=$('ov');
+C.forEach((c,i)=>{const b=document.createElement('button');b.textContent=c[0];b.onclick=()=>pick(i);$('bt').append(b)});
+function next(){const wd=rnd(6);let k;do{k=rnd(6)}while(k===wd);ink=k;const w=$('w');w.textContent=C[wd][0];w.style.color=C[k][1]}
+function start(){sc=0;t=30;run=true;ov.classList.add('hide');$('score').textContent=0;$('time').textContent=30;$('best').textContent=best;next();clearInterval(tm);tm=setInterval(()=>{$('time').textContent=--t;if(t<=0)end()},1000)}
+function end(){run=false;clearInterval(tm);if(sc>best){best=sc;ls('bestColor',best)}$('best').textContent=best;overlay(ov,'Time','Score '+sc,'Play Again',start)}
+function pick(i){if(!run)return;if(i===ink)sc++;else sc=Math.max(0,sc-1);$('score').textContent=sc;next()}
+addEventListener('keydown',e=>{if(e.key>='1'&&e.key<='6'&&!e.repeat)pick(+e.key-1)});ov.querySelector('button').onclick=start;$('newbtn').onclick=start;</script></body></html>

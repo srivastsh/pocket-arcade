@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Maze</title><link rel="stylesheet" href="shared.css"><style>
+.wrap{position:relative;touch-action:none;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);overflow:hidden;line-height:0}
+canvas{display:block}
+.dpad{display:none;flex-direction:column;align-items:center;gap:6px}.dpad div{display:flex;gap:6px}.dpad button{width:60px;height:52px;border:0;border-radius:14px;background:var(--card);box-shadow:var(--shadow);font-size:20px;color:var(--text)}
+@media(pointer:coarse){.dpad{display:flex}}</style></head><body><header class="bar"><a class="back" href="index.html">Games</a><h1>Maze</h1><div class="right"><button class="btn sec" id="newbtn">New Maze</button></div></header><main>
+<div class="seg" id="seg"><button data-n="12">Small</button><button class="on" data-n="20">Medium</button><button data-n="30">Large</button></div>
+<div class="stats"><div class="stat"><small>Time</small><b id="time">0:00</b></div><div class="stat"><small>Best</small><b id="best">-</b></div></div>
+<div class="wrap"><canvas id="cv"></canvas><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Escaped</h2><p></p><button class="btn">New Maze</button></div></div></div>
+<div class="dpad"><button data-d="0" aria-label="Up">▲</button><div><button data-d="3" aria-label="Left">◀</button><button data-d="2" aria-label="Down">▼</button><button data-d="1" aria-label="Right">▶</button></div></div>
+<div class="hint">Arrow keys, WASD or swipe. Reach the blue square.</div></main><script src="board-colors.js"></script><script src="controls.js"></script><script src="common.js"></script><script>
+const cv=$('cv'),ctx=cv.getContext('2d'),ov=$('ov');let n=20,cells,px,py,trail,t0,tm,won,s;
+
+function fit(){const w=Math.max(200,Math.min(innerWidth*.92,620,innerHeight-260)),d=devicePixelRatio||1;s=Math.floor(w/n);cv.style.width=cv.style.height=s*n+'px';cv.width=cv.height=s*n*d;ctx.setTransform(d,0,0,d,0,0);if(cells)draw()}
+function gen(){cells=Array.from({length:n*n},()=>[1,1,1,1]);const seen=new Set([0]),st=[0];const D=[[-1,0,0,2],[0,1,1,3],[1,0,2,0],[0,-1,3,1]];
+  while(st.length){const i=st[st.length-1],r=i/n|0,c=i%n;const o=D.filter(([dr,dc])=>{const rr=r+dr,cc=c+dc;return rr>=0&&rr<n&&cc>=0&&cc<n&&!seen.has(rr*n+cc)});if(!o.length){st.pop();continue}const[dr,dc,a,b]=o[rnd(o.length)],j=(r+dr)*n+c+dc;cells[i][a]=0;cells[j][b]=0;seen.add(j);st.push(j)}}
+function bk(){return 'mzBest'+n}
+let resultTimer;
+function reset(){clearTimeout(resultTimer);clearInterval(tm);gen();px=py=0;trail=[[0,0]];won=false;t0=0;ov.classList.add('hide');$('time').textContent='0:00';const b=+ls(bk());$('best').textContent=b?fmt(b):'-';fit()}
+function draw(){ctx.clearRect(0,0,s*n,s*n);const tx=boardColors.text;
+  ctx.fillStyle=boardColors.blue;ctx.beginPath();ctx.roundRect((n-1)*s+s*.2,(n-1)*s+s*.2,s*.6,s*.6,s*.15);ctx.fill();
+  ctx.strokeStyle='rgba(48,209,88,.5)';ctx.lineWidth=s*.3;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();trail.forEach(([x,y],i)=>{const X=(x+.5)*s,Y=(y+.5)*s;i?ctx.lineTo(X,Y):ctx.moveTo(X,Y)});ctx.stroke();
+  ctx.strokeStyle=tx;ctx.lineWidth=Math.max(2,s*.09);ctx.lineCap='round';ctx.beginPath();
+  cells.forEach((w,i)=>{const x=(i%n)*s,y=(i/n|0)*s;if(w[0]){ctx.moveTo(x,y);ctx.lineTo(x+s,y)}if(w[1]){ctx.moveTo(x+s,y);ctx.lineTo(x+s,y+s)}if(w[2]){ctx.moveTo(x,y+s);ctx.lineTo(x+s,y+s)}if(w[3]){ctx.moveTo(x,y);ctx.lineTo(x,y+s)}});ctx.stroke();
+  ctx.fillStyle=boardColors.orange;ctx.beginPath();ctx.arc((px+.5)*s,(py+.5)*s,s*.3,0,7);ctx.fill()}
+function move(d){if(won)return;const w=cells[py*n+px];if(w[d])return;if(!t0){t0=Date.now();tm=setInterval(()=>$('time').textContent=fmt((Date.now()-t0)/1000|0),500)}
+  px+=[0,1,0,-1][d];py+=[-1,0,1,0][d];const k=trail.findIndex(([x,y])=>x===px&&y===py);if(k>=0)trail.length=k+1;else trail.push([px,py]);draw();
+  if(px===n-1&&py===n-1){won=true;clearInterval(tm);const t=(Date.now()-t0)/1000|0,b=+ls(bk());if(!b||t<b){ls(bk(),t);$('best').textContent=fmt(t)}resultTimer=setTimeout(()=>overlay(ov,'Escaped','Time '+fmt(t),'New Maze',reset),250)}}
+bindGameKeys({
+  ArrowUp: () => move(0), ArrowRight: () => move(1),
+  ArrowDown: () => move(2), ArrowLeft: () => move(3)
+});
+let sx,sy;cv.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY});cv.addEventListener('pointercancel',()=>sx=null);cv.addEventListener('pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=null;if(Math.max(Math.abs(dx),Math.abs(dy))<20)return;move(Math.abs(dx)>Math.abs(dy)?(dx<0?3:1):(dy<0?0:2))});
+document.querySelector('.dpad').onclick=e=>{const b=e.target.closest('button');if(b)move(+b.dataset.d)};
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;n=+b.dataset.n;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));reset()};
+addEventListener('boardcolorschange',draw);addEventListener('resize',fit);$('newbtn').onclick=reset;reset();</script></body></html>

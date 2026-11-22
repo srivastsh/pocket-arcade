@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Tic-Tac-Toe</title><link rel="stylesheet" href="shared.css">
+<style>
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:min(88vw,380px);padding:12px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.c{aspect-ratio:1;border:0;border-radius:18px;background:var(--cell);cursor:pointer;display:grid;place-items:center;padding:16%;transition:background .15s}
+.c:hover:not(.d){background:rgba(128,128,128,.28)}
+.c.d{cursor:default}
+.c.w{background:rgba(52,199,89,.3)}
+svg{width:100%;height:100%;overflow:visible}
+.x line{stroke:var(--blue);stroke-width:12;stroke-linecap:round;stroke-dasharray:80;stroke-dashoffset:80;animation:dr .25s forwards}
+.x line+line{animation-delay:.12s}
+.o circle{fill:none;stroke:var(--red);stroke-width:12;stroke-linecap:round;stroke-dasharray:190;stroke-dashoffset:190;animation:dr .35s forwards}
+@keyframes dr{to{stroke-dashoffset:0}}
+.msg{font-weight:600;font-size:17px;min-height:24px}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Tic-Tac-Toe</h1><div class="right"><button class="btn sec" id="newbtn">New Round</button></div></header>
+<main>
+<div class="seg" id="seg"><button data-m="e">Easy</button><button class="on" data-m="h">Unbeatable</button><button data-m="2">2 Players</button></div>
+<div class="stats"><div class="stat"><small id="l1">You</small><b id="s1">0</b></div><div class="stat"><small>Draws</small><b id="s0">0</b></div><div class="stat"><small id="l2">CPU</small><b id="s2">0</b></div></div>
+<div class="msg" id="msg"></div>
+<div class="board" id="board"></div>
+<div class="hint">Use WASD or arrows to choose a square. Return plays it.</div></main>
+<script src="controls.js"></script><script>
+const $=id=>document.getElementById(id),brd=$('board');const L=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+let b,turn,over,mode='h',first=1,sc=[0,0,0],cpuT;
+for(let i=0;i<9;i++){const c=document.createElement('button');c.className='c';c.dataset.i=i;c.setAttribute('aria-label','Square '+(i+1));brd.append(c)}
+const X='<svg viewBox="0 0 100 100" class="x"><line x1="8" y1="8" x2="92" y2="92"/><line x1="92" y1="8" x2="8" y2="92"/></svg>',O='<svg viewBox="0 0 100 100" class="o"><circle cx="50" cy="50" r="40"/></svg>';
+const win=(b,p)=>L.find(l=>l.every(i=>b[i]===p));
+// negamax-style: score from perspective of player 2 (CPU)
+function cpuMove(){const e=b.map((v,i)=>v?-1:i).filter(i=>i>=0);if(mode==='e'&&Math.random()<.55)return e[Math.random()*e.length|0];
+  let best=-99,mv=[];for(const i of e){b[i]=2;const s=-nega(b,1);b[i]=0;if(s>best){best=s;mv=[i]}else if(s===best)mv.push(i)}return mv[Math.random()*mv.length|0]}
+function nega(b,p){if(win(b,3-p))return -(10-b.filter(Boolean).length)-0;const e=b.map((v,i)=>v?-1:i).filter(i=>i>=0);if(!e.length)return 0;let best=-99;for(const i of e){b[i]=p;best=Math.max(best,-nega(b,3-p));b[i]=0}return best}
+function render(w){[...brd.children].forEach((c,i)=>{c.innerHTML=b[i]===1?X:b[i]===2?O:'';c.classList.toggle('d',!!b[i]||over);c.classList.toggle('w',!!w&&w.includes(i))});
+  const n2=mode==='2';$('l1').textContent=n2?'X':'You';$('l2').textContent=n2?'O':'CPU';
+  $('msg').textContent=over?(w?(n2?(turn===1?'X wins':'O wins'):(turn===1?'You win':'CPU wins')):'Draw'):(n2?(turn===1?"X's turn":"O's turn"):(turn===1?'Your turn':'CPU is thinking'))}
+function reset(){clearTimeout(cpuT);b=Array(9).fill(0);over=false;turn=first;render();if(mode!=='2'&&turn===2)cpuT=setTimeout(cpu,450)}
+function cpu(){if(over||turn!==2||mode==='2')return;put(cpuMove())}
+function put(i){if(over||b[i])return;b[i]=turn;const w=win(b,turn);
+  if(w){over=true;sc[turn]++;$('s'+turn).textContent=sc[turn];render(w);return}
+  if(b.every(Boolean)){over=true;sc[0]++;$('s0').textContent=sc[0];render();return}
+  turn=3-turn;render();if(mode!=='2'&&turn===2)cpuT=setTimeout(cpu,450)}
+brd.addEventListener('click',e=>{const c=e.target.closest('.c');if(!c||over)return;if(mode!=='2'&&turn===2)return;put(+c.dataset.i)});
+$('seg').onclick=e=>{const x=e.target.closest('button');if(!x)return;mode=x.dataset.m;[...$('seg').children].forEach(y=>y.classList.toggle('on',y===x));sc=[0,0,0];['s0','s1','s2'].forEach(k=>$(k).textContent=0);first=1;reset()};
+$('newbtn').onclick=()=>{first=3-first;reset()};reset();
+
+enableGridNavigation(brd, '.c', () => !over);
+</script></body></html>

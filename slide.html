@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Slide</title><link rel="stylesheet" href="shared.css">
+<style>
+.board{position:relative;width:min(92vw,440px);aspect-ratio:1;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);padding:8px;touch-action:manipulation}
+.in{position:relative;width:100%;height:100%}
+.tile{position:absolute;padding:4px;transition:left .14s ease-out,top .14s ease-out}
+.tile>div{width:100%;height:100%;border-radius:16%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:clamp(22px,8vw,42px);cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 3px 8px rgba(0,0,0,.15)}
+.tile:active>div{transform:scale(.96)}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Slide</h1><div class="right"><button class="btn sec" id="newbtn">Shuffle</button></div></header>
+<main>
+<div class="seg" id="seg"><button data-n="3">3×3</button><button class="on" data-n="4">4×4</button><button data-n="5">5×5</button></div>
+<div class="stats"><div class="stat"><small>Moves</small><b id="mv">0</b></div><div class="stat"><small>Time</small><b id="time">0</b></div><div class="stat"><small>Best</small><b id="best">-</b></div></div>
+<div class="board"><div class="in" id="in"></div><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Solved</h2><p id="ovp"></p><button class="btn" id="ovb">Play Again</button></div></div></div>
+<div class="hint">Click a tile or use WASD or the arrow keys to slide it into the gap.</div>
+</main>
+<script src="controls.js"></script><script>
+const $=id=>document.getElementById(id),inn=$('in'),ov=$('ov');let n=4,a,els,moves,t0,tm,won;
+const bestK=()=>'slideBest'+n;const best=()=>{try{return +localStorage.getItem(bestK())||0}catch(e){return 0}};
+function hue(v){return `linear-gradient(160deg,hsl(${210+v*(150/(n*n))} 85% 62%),hsl(${210+v*(150/(n*n))} 80% 50%))`}
+function pos(){a.forEach((v,i)=>{if(!v)return;const e=els[v];e.style.left=(i%n)*100/n+'%';e.style.top=(i/n|0)*100/n+'%'})}
+let resultTimer;
+function reset(){clearTimeout(resultTimer);clearInterval(tm);inn.innerHTML='';els={};won=false;moves=0;t0=0;ov.classList.add('hide');$('mv').textContent=0;$('time').textContent=0;$('best').textContent=best()||'-';
+  a=[...Array(n*n).keys()].map(i=>(i+1)%(n*n));
+  for(let v=1;v<n*n;v++){const e=document.createElement('div');e.className='tile';e.style.width=e.style.height=100/n+'%';e.innerHTML=`<div style="background:${hue(v)}">${v}</div>`;e.firstChild.setAttribute('role','button');e.onclick=()=>tap(v);inn.append(e);els[v]=e}
+  let ei=n*n-1,prev=-1;for(let k=0;k<n*n*40;k++){const o=[];if(ei%n)o.push(ei-1);if(ei%n<n-1)o.push(ei+1);if(ei>=n)o.push(ei-n);if(ei<n*n-n)o.push(ei+n);const c=o.filter(x=>x!==prev),j=c[Math.random()*c.length|0];[a[ei],a[j]]=[a[j],a[ei]];prev=ei;ei=j}
+  if(a.every((v,i)=>v===(i+1)%(n*n)))return reset();pos()}
+function tap(v){if(won)return;const i=a.indexOf(v),e=a.indexOf(0);let st;
+  if(i%n===e%n)st=i<e?n:-n;else if((i/n|0)===(e/n|0))st=i<e?1:-1;else return;
+  for(let k=e;k!==i;k-=st)a[k]=a[k-st];a[i]=0;pos();count()}
+function count(){if(!t0){t0=Date.now();tm=setInterval(()=>$('time').textContent=(Date.now()-t0)/1000|0,500)}moves++;$('mv').textContent=moves;
+  if(a.every((v,i)=>v===(i+1)%(n*n))){won=true;clearInterval(tm);const b=best();if(!b||moves<b){try{localStorage.setItem(bestK(),moves)}catch(e){}$('best').textContent=moves}resultTimer=setTimeout(()=>{if(!won)return;$('ovp').textContent=`${moves} moves in ${(Date.now()-t0)/1000|0}s`;ov.classList.remove('hide')},300)}}
+function slideBy(offset) {
+  const gap = a.indexOf(0), tile = gap + offset;
+  if (tile < 0 || tile >= a.length) return;
+  if (Math.abs(offset) === 1 && Math.floor(tile / n) !== Math.floor(gap / n)) return;
+  tap(a[tile]);
+}
+bindGameKeys({
+  ArrowLeft: () => slideBy(1), ArrowRight: () => slideBy(-1),
+  ArrowUp: () => slideBy(n), ArrowDown: () => slideBy(-n)
+});
+$('seg').onclick=e=>{const b=e.target.closest('button');if(!b)return;n=+b.dataset.n;[...$('seg').children].forEach(x=>x.classList.toggle('on',x===b));reset()};
+$('newbtn').onclick=reset;$('ovb').onclick=reset;reset();
+</script></body></html>

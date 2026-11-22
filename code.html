@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Code</title><link rel="stylesheet" href="shared.css">
+<style>
+.wrap{position:relative;width:min(92vw,340px);padding:14px;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);display:grid;gap:8px;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.row{display:grid;grid-template-columns:1fr 30px;gap:12px;align-items:center;padding:4px 8px;border-radius:14px}
+.row.cur{background:var(--cell)}
+.pegs{display:grid;grid-template-columns:repeat(4,minmax(0,38px));gap:10px;justify-content:start}
+.p{aspect-ratio:1;border-radius:50%;border:0;padding:0;background:var(--cell);box-shadow:inset 0 2px 3px rgba(0,0,0,.18);display:grid;place-items:center;font-size:18px;font-weight:700;color:var(--sub)}
+.p.f{box-shadow:inset 0 -3px 5px rgba(0,0,0,.2),inset 0 3px 3px rgba(255,255,255,.35),0 1px 3px rgba(0,0,0,.2);color:transparent}
+.row.cur .p{cursor:pointer}
+.fb{display:grid;grid-template-columns:1fr 1fr;gap:3px;width:30px}
+.fb i{aspect-ratio:1;border-radius:50%;background:var(--line)}
+.fb i.k{background:var(--text)}.fb i.w{background:transparent;box-shadow:inset 0 0 0 2px var(--text)}
+.sec-row{padding-bottom:10px;border-bottom:1px solid var(--line)}
+.pal{display:flex;gap:10px;justify-content:center}
+.pal button{width:44px;height:44px;border-radius:50%;border:0;cursor:pointer;box-shadow:inset 0 -3px 5px rgba(0,0,0,.2),inset 0 3px 3px rgba(255,255,255,.35),0 2px 6px rgba(0,0,0,.2);transition:transform .1s}
+.pal button:active{transform:scale(.88)}
+.msg{font-weight:600;font-size:17px;min-height:24px}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Code</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="stats"><div class="stat"><small>Guess</small><b id="gn">1/10</b></div><div class="stat"><small>Best</small><b id="best">-</b></div></div>
+<div class="wrap" id="wrap"><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="ovt"><h2 id="ovt"></h2><p id="ovp"></p><button class="btn" id="ovb">Play Again</button></div></div></div>
+<div class="pal" id="pal"></div>
+<div class="ctrl"><button class="btn" id="go" disabled>Check</button></div>
+<div class="hint">Crack the 4-color code. A solid pin means right color and place. A ring means right color, wrong place. Keys 1 to 6 pick colors, Enter checks.</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const COL=['#ff453a','#ff9f0a','#ffd60a','#30d158','#0a84ff','#bf5af2'],CN=['Red','Orange','Yellow','Green','Blue','Purple'];
+let sec,gs,cur,over;
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+const wrap=$('wrap'),ov=$('ov');
+COL.forEach((c,i)=>{const b=document.createElement('button');b.style.background=c;b.dataset.i=i;b.setAttribute('aria-label',CN[i]+' ('+(i+1)+')');$('pal').append(b)});
+let resultTimer;
+function reset(){clearTimeout(resultTimer);sec=[0,0,0,0].map(()=>Math.random()*6|0);gs=[];cur=[];over=false;ov.classList.add('hide');$('best').textContent=ls('bestCode')||'-';render()}
+function fb(g){let k=0;const a=Array(6).fill(0),b=Array(6).fill(0);g.forEach((v,i)=>{if(v===sec[i])k++;else{a[v]++;b[sec[i]]++}});let w=0;for(let i=0;i<6;i++)w+=Math.min(a[i],b[i]);return[k,w]}
+function peg(v,cls=''){return`<div class="p ${v==null?'':'f'} ${cls}" ${v==null?'':`style="background:${COL[v]}"`}>${v==null?'':'.'}</div>`}
+function render(){
+  let h=`<div class="row sec-row"><div class="pegs">${sec.map(v=>over?peg(v):'<div class="p">?</div>').join('')}</div><div></div></div>`;
+  for(let r=0;r<10;r++){const done=r<gs.length,isCur=r===gs.length&&!over;let pegs='',f='';
+    for(let c=0;c<4;c++){const v=done?gs[r][c]:isCur?cur[c]:null;pegs+=peg(v==null?null:v)}
+    if(done){const[k,w]=fb(gs[r]);f=Array(k).fill('<i class="k"></i>').concat(Array(w).fill('<i class="w"></i>'),Array(4-k-w).fill('<i></i>')).join('')}else f='<i></i><i></i><i></i><i></i>';
+    h+=`<div class="row${isCur?' cur':''}"><div class="pegs"${isCur?' data-cur':''}>${pegs}</div><div class="fb">${f}</div></div>`}
+  wrap.innerHTML=h;wrap.append(ov);$('gn').textContent=Math.min(gs.length+1,10)+'/10';$('go').disabled=over||cur.filter(v=>v!=null).length<4}
+function add(i){if(over||cur.length>=4)return;cur.push(i);render()}
+function submit(){if(over||cur.length<4)return;const g=cur.slice();gs.push(g);cur=[];const[k]=fb(g);
+  if(k===4){over=true;const b=+ls('bestCode')||99;if(gs.length<b)ls('bestCode',gs.length);render();$('best').textContent=ls('bestCode')||'-';$('ovt').textContent='Cracked';$('ovp').textContent=`${gs.length} ${gs.length===1?'guess':'guesses'}`;resultTimer=setTimeout(()=>ov.classList.remove('hide'),500);return}
+  if(gs.length>=10){over=true;render();$('ovt').textContent='Out of guesses';$('ovp').textContent='The code is shown at the top.';resultTimer=setTimeout(()=>ov.classList.remove('hide'),500);return}
+  render()}
+$('pal').addEventListener('click',e=>{const b=e.target.closest('button');if(b)add(+b.dataset.i)});
+wrap.addEventListener('click',e=>{const p=e.target.closest('.p');const g=p&&p.parentElement.hasAttribute('data-cur');if(!g)return;const i=[...p.parentElement.children].indexOf(p);if(i<cur.length){cur.splice(i,1);render()}});
+addEventListener('keydown',e=>{if(e.metaKey||e.ctrlKey||e.altKey||over)return;if(e.key>='1'&&e.key<='6')add(+e.key-1);else if(e.key==='Backspace'){e.preventDefault();cur.pop();render()}else if(e.key==='Enter'){e.preventDefault();submit()}});
+$('go').onclick=submit;$('newbtn').onclick=reset;$('ovb').onclick=reset;reset();
+</script></body></html>

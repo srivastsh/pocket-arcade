@@ -1,0 +1,86 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>2048</title><link rel="stylesheet" href="shared.css">
+<style>
+.board{position:relative;width:min(92vw,460px);aspect-ratio:1;border-radius:var(--r);background:var(--card);box-shadow:var(--shadow);touch-action:none;overflow:hidden}
+.slot{position:absolute;width:22.5%;height:22.5%;border-radius:14px;background:var(--cell)}
+.tile{position:absolute;left:2.5%;top:2.5%;width:22.5%;height:22.5%;border-radius:14px;display:grid;place-items:center;font-weight:700;color:#fff;font-size:clamp(22px,7.5vw,40px);letter-spacing:-.02em;transition:transform .11s ease-out;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 4px 10px rgba(0,0,0,.15)}
+.tile.new{animation:appear .2s ease-out .08s backwards}
+.tile.pop{animation:pop .18s ease-out}
+@keyframes appear{from{scale:.4;opacity:0}}
+@keyframes pop{50%{scale:1.14}}
+</style></head><body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>2048</h1><div class="right"><button class="btn sec" id="newbtn">New Game</button></div></header>
+<main>
+<div class="stats"><div class="stat"><small>Score</small><b id="score">0</b></div><div class="stat"><small>Best</small><b id="best">0</b></div></div>
+<div class="board" id="board"><div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="ovt"><h2 id="ovt"></h2><p id="ovp"></p><button class="btn" id="ovb"></button></div></div></div>
+<div class="hint">Arrow keys, WASD or swipe</div>
+</main>
+<script src="controls.js"></script><script>
+const N=4,board=document.getElementById('board'),ov=document.getElementById('ov');
+const $=id=>document.getElementById(id);
+const ls=(k,v)=>{try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){}};
+const COL=['','#64a8ff','#4f8cff','#6a7bff','#8e6bff','#b05cf5','#d14fd8','#ee4fa6','#ff5c7a','#ff7a45','#ff9f0a','#ffcc00'];
+let grid,score,best=+ls('best2048')||0,won,over;
+for(let i=0;i<16;i++){const s=document.createElement('div');s.className='slot';s.style.left=`calc(2.5% + ${i%4*25}%)`;s.style.top=`calc(2.5% + ${(i/4|0)*25}%)`;board.insertBefore(s,ov)}
+const color=v=>COL[Math.min(Math.log2(v),11)]||'#30d158';
+function place(t){t.el.style.transform=`translate(${t.c*111.111}%,${t.r*111.111}%)`}
+function paint(t){t.el.textContent=t.v;t.el.style.background=color(t.v);t.el.style.fontSize=t.v>=1000?'clamp(16px,5.6vw,30px)':t.v>=100?'clamp(19px,6.6vw,35px)':''}
+function make(r,c,v,cls){const el=document.createElement('div');el.className='tile '+(cls||'');board.insertBefore(el,ov);const t={r,c,v,el};paint(t);place(t);return t}
+function add(){const e=[];for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(!grid[r][c])e.push([r,c]);if(!e.length)return;const [r,c]=e[Math.random()*e.length|0];grid[r][c]=make(r,c,Math.random()<.9?2:4,'new')}
+function reset(){board.querySelectorAll('.tile').forEach(t=>t.remove());grid=Array.from({length:N},()=>Array(N).fill(null));score=0;won=false;over=false;ov.classList.add('hide');add();add();upd();saveBoard()}
+function upd(){$('score').textContent=score;if(score>best){best=score;ls('best2048',best)}$('best').textContent=best}
+function pos(d,i,k){return d===0?[i,k]:d===2?[i,N-1-k]:d===1?[k,i]:[N-1-k,i]}
+function move(d){
+  if(over||!ov.classList.contains('hide'))return;let moved=false,gain=0;const dead=[],grow=[];
+  for(let i=0;i<N;i++){
+    const ts=[];for(let k=0;k<N;k++){const [r,c]=pos(d,i,k);if(grid[r][c])ts.push(grid[r][c])}
+    const out=[];
+    for(const t of ts){const l=out[out.length-1];
+      if(l&&!l.m&&l.v===t.v){l.v*=2;l.m=true;gain+=l.v;t.into=l;dead.push(t);moved=true}else out.push(t)}
+    for(let k=0;k<N;k++){const [r,c]=pos(d,i,k);grid[r][c]=null}
+    out.forEach((t,k)=>{const [r,c]=pos(d,i,k);if(t.r!==r||t.c!==c)moved=true;t.r=r;t.c=c;grid[r][c]=t;if(t.m){grow.push(t);t.m=false}});
+    for(const t of dead)if(t.into&&!t.set){t.r=t.into.r;t.c=t.into.c;t.set=1}
+  }
+  if(!moved)return;
+  [...grid.flat().filter(Boolean),...dead].forEach(place);
+  score+=gain;
+  setTimeout(()=>{dead.forEach(t=>t.el.remove());grow.forEach(t=>{paint(t);t.el.classList.remove('pop');void t.el.offsetWidth;t.el.classList.add('pop')})},110);
+  add();upd();
+  checkBoard();saveBoard();
+}
+function checkBoard() {
+  if (!won && grid.some(row => row.some(tile => tile && tile.v >= 2048))) {
+    show('2048', 'You reached the tile.', 'Keep Going', () => {
+      won = true; ov.classList.add('hide'); checkBoard(); saveBoard();
+    });
+  } else if (!can()) {
+    over = true; show('Game Over', 'No moves left.', 'Try Again', reset);
+  }
+}
+function saveBoard() {
+  const cells = grid.map(row => row.map(tile => tile ? tile.v : 0));
+  ls('board2048', JSON.stringify({cells, score, won}));
+}
+function restoreBoard() {
+  let saved;
+  try { saved = JSON.parse(ls('board2048')); } catch { return false; }
+  const validTile = v => v === 0 || (Number.isSafeInteger(v) && v >= 2 && Number.isInteger(Math.log2(v)));
+  if (!saved || !Array.isArray(saved.cells) || saved.cells.length !== N ||
+      !saved.cells.every(row => Array.isArray(row) && row.length === N && row.every(validTile)) ||
+      !saved.cells.some(row => row.some(Boolean)) ||
+      !Number.isSafeInteger(saved.score) || saved.score < 0 || typeof saved.won !== 'boolean') return false;
+  grid = saved.cells.map((row, r) => row.map((v, c) => v ? make(r, c, v) : null));
+  score = saved.score; won = saved.won; over = false;
+  upd(); checkBoard();
+  return true;
+}
+function can(){for(let r=0;r<N;r++)for(let c=0;c<N;c++){if(!grid[r][c])return true;const v=grid[r][c].v;if(c<N-1&&grid[r][c+1]&&grid[r][c+1].v===v)return true;if(r<N-1&&grid[r+1][c]&&grid[r+1][c].v===v)return true}return false}
+function show(t,p,b,f){$('ovt').textContent=t;$('ovp').textContent=p;const btn=$('ovb');btn.textContent=b;btn.onclick=f;ov.classList.remove('hide')}
+bindGameKeys({
+  ArrowLeft: () => move(0), ArrowUp: () => move(1),
+  ArrowRight: () => move(2), ArrowDown: () => move(3)
+});
+let sx,sy;board.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY;if(e.target===board||e.target.classList.contains('tile')||e.target.classList.contains('slot'))try{board.setPointerCapture(e.pointerId)}catch(_){}});
+board.addEventListener('pointercancel',()=>sx=null);
+board.addEventListener('pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=null;if(Math.max(Math.abs(dx),Math.abs(dy))<24)return;move(Math.abs(dx)>Math.abs(dy)?(dx<0?0:2):(dy<0?1:3))});
+$('newbtn').onclick=reset;if(!restoreBoard())reset();
+</script></body></html>

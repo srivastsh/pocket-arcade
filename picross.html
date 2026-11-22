@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily Picross</title><link rel="stylesheet" href="shared.css">
+<style>
+.puzzle { width:min(95%, 476px); padding:clamp(10px, 3vw, 22px); background:var(--card); border-radius:var(--r); box-shadow:var(--shadow); position:relative; }
+.nonogram { display:grid; grid-template-columns:max-content minmax(0,1fr); gap:6px; }
+.columns, .cells { display:grid; grid-template-columns:repeat(8,minmax(0,1fr)); }
+.columns { grid-column:2; }
+.rows { display:grid; grid-template-rows:repeat(8,1fr); }
+.clue { display:flex; gap:.25em; color:var(--text); font-weight:620; font-size:clamp(11px,2.8vw,15px); line-height:1.05; font-variant-numeric:tabular-nums; }
+.columns .clue { flex-direction:column; justify-content:flex-end; align-items:center; }
+.rows .clue { align-items:center; justify-content:flex-end; }
+.clue.matched { color:var(--accent-text); }
+.cells { aspect-ratio:1; touch-action:none; border:1px solid var(--line2); background:var(--line); gap:1px; border-radius:4px; }
+.cell { min-width:0; min-height:0; position:relative; padding:0; border:0; border-radius:0; background:var(--card); cursor:pointer; display:grid; place-content:center; line-height:1; font-size:clamp(15px,4vw,24px); font-weight:450; color:var(--sub); }
+.cell:nth-child(4n):not(:nth-child(8n)) { box-shadow:inset -1px 0 var(--line2); }
+.cell:nth-child(n+25):nth-child(-n+32) { border-bottom:1px solid var(--line2); }
+.cell.filled { background:var(--indigo); }
+.cell:focus-visible { outline:3px solid var(--blue); outline-offset:-3px; z-index:1; }
+.cell.filled:focus-visible { outline-color:white; }
+.cell:disabled { opacity:1; cursor:default; }
+#stamp { font-size:17px; white-space:nowrap; }
+.hint { max-width:49ch; }
+</style>
+</head>
+<body>
+<header class="bar"><a class="back" href="index.html">Games</a><h1>Daily Picross</h1><div class="right"><button class="btn sec" id="undo">Undo</button><button class="btn sec" id="newbtn">New Practice</button></div></header>
+<main>
+<div class="seg" aria-label="Puzzle"><button id="daily">Daily</button><button id="practice">Practice</button></div>
+<div class="stats"><div class="stat"><small id="stampLabel">Daily puzzle</small><b id="stamp"></b></div><div class="stat"><small id="progressLabel">Filled</small><b id="count"></b></div></div>
+<div class="puzzle">
+  <div class="nonogram">
+    <div class="columns" id="columns"></div><div class="rows" id="rows"></div>
+    <div class="cells" id="cells" role="group" aria-label="Picross board" aria-describedby="instructions"></div>
+  </div>
+  <div class="overlay hide" id="ov"><div class="game-sheet" role="group" aria-labelledby="sheet-title"><h2 id="sheet-title">Puzzle solved</h2><p id="result"></p><button class="btn" id="view">View Puzzle</button></div></div>
+</div>
+<div class="seg" aria-label="Marking tool"><button id="fill">Fill</button><button id="cross">Cross</button></div>
+<p class="hint" id="instructions">Numbers give the lengths of filled groups in order. Leave at least one empty square between groups. Drag to mark. Use WASD or arrows to move, Return to mark and X to cross.</p>
+</main>
+<script src="common.js"></script><script src="controls.js"></script>
+<script>
+const SIZE = 8;
+const FULL = (1 << SIZE) - 1;
+function runs(mask) {
+  const lengths = [];
+  let length = 0;
+  for (let i = 0; i <= SIZE; i++) {
+    if (mask & (1 << i)) length++;
+    else if (length) { lengths.push(length); length = 0; }
+  }
+  return lengths;
+}
+function transpose(rows) {
+  return Array.from({length:SIZE}, (_, c) => rows.reduce((bits, row, r) => bits | ((row >> c & 1) << r), 0));
+}
+const patterns = new Map();
+for (let mask = 0; mask <= FULL; mask++) {
+  const clue = runs(mask).join(',');
+  if (!patterns.has(clue)) patterns.set(clue, []);
+  patterns.get(clue).push(mask);
+}
+// Accept puzzles only when row and column clues alone force every square.
+function solvesByDeduction(rows) {
+  const axes = [...rows, ...transpose(rows)].map(mask => patterns.get(runs(mask).join(',')));
+  const known = Array(SIZE * SIZE).fill(-1);
+  let changed;
+  do {
+    changed = false;
+    for (let i = 0; i < axes.length; i++) {
+      const indices = Array.from({length:SIZE}, (_, j) => i < SIZE ? i * SIZE + j : j * SIZE + i - SIZE);
+      const options = axes[i].filter(mask => indices.every((at, bit) => known[at] < 0 || known[at] === (mask >> bit & 1)));
+      if (!options.length) return false;
+      axes[i] = options;
+      const always = options.reduce((mask, x) => mask & x, FULL);
+      const maybe = options.reduce((mask, x) => mask | x, 0);
+      indices.forEach((at, bit) => {
+        if (known[at] >= 0 || ((maybe ^ always) & (1 << bit))) return;
+        known[at] = always >> bit & 1;
+        changed = true;
+      });
+    }
+  } while (changed);
+  return known.every(value => value >= 0);
+}
+function makePuzzle(seed) {
+  let state = seed >>> 0;
+  function randomMask() {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return (state >>> 21) % 15 + 1;
+  }
+  // Mirror a half-sprite to give each board its own pixel-art silhouette.
+  for (let attempt = 0; attempt < 80; attempt++) {
+    const rows = Array.from({length:SIZE}, () => {
+      const half = randomMask();
+      return half | ((half & 1) << 7) | ((half & 2) << 5) | ((half & 4) << 3) | ((half & 8) << 1);
+    });
+    if (new Set(rows).size >= 4 && solvesByDeduction(rows)) return rows;
+  }
+  return [0x66,0xff,0xff,0xff,0x7e,0x3c,0x18,0];
+}
+function localDay(date = new Date()) {
+  return date.getFullYear() * 10000 + (date.getMonth() + 1) * 100 + date.getDate();
+}
+function randomSeed() {
+  return crypto.getRandomValues(new Uint32Array(1))[0];
+}
+function readSave(key) {
+  try { return JSON.parse(ls('picross.v1.' + key)); } catch { return null; }
+}
+let mode, seed, answer, marks, rowClues, columnClues, solved, history = [], tool = 1, drag = null;
+const cells = $('cells'), sheet = $('ov');
+const buttons = Array.from({length:SIZE * SIZE}, (_, at) => {
+  const button = document.createElement('button');
+  button.className = 'cell';
+  button.dataset.at = at;
+  button.tabIndex = at ? -1 : 0;
+  cells.append(button);
+  return button;
+});
+function tabStop(at) {
+  buttons.forEach((button, i) => button.tabIndex = i === at ? 0 : -1);
+}
+cells.addEventListener('focusin', event => {
+  if (event.target.matches('.cell')) tabStop(Number(event.target.dataset.at));
+});
+function markSelected(button, selected) {
+  button.classList.toggle('on', selected);
+  button.setAttribute('aria-pressed', String(selected));
+}
+function paintClues(el, masks) {
+  el.replaceChildren(...masks.map(mask => {
+    const item = document.createElement('div');
+    item.className = 'clue';
+    const lengths = runs(mask);
+    for (const count of lengths.length ? lengths : [0]) {
+      const number = document.createElement('span');
+      number.textContent = count;
+      item.append(number);
+    }
+    return item;
+  }));
+}
+function save() { ls('picross.v1.' + mode, JSON.stringify({seed, marks})); }
+function loadPuzzle(nextMode, fresh = false) {
+  mode = nextMode;
+  const saved = fresh ? null : readSave(mode);
+  const validSeed = Number.isInteger(saved?.seed) && saved.seed >= 0 && saved.seed <= 0xffffffff;
+  seed = mode === 'daily' ? localDay() : validSeed ? saved.seed : randomSeed();
+  answer = makePuzzle(seed);
+  const validMarks = saved?.seed === seed && Array.isArray(saved.marks) && saved.marks.length === buttons.length &&
+    saved.marks.every(value => value === 0 || value === 1 || value === 2);
+  marks = validMarks ? saved.marks.slice() : buttons.map(() => 0);
+  history = []; drag = null; tabStop(0);
+  rowClues = answer.map(mask => runs(mask).join(','));
+  const columns = transpose(answer);
+  columnClues = columns.map(mask => runs(mask).join(','));
+  paintClues($('rows'), answer);
+  paintClues($('columns'), columns);
+  markSelected($('daily'), mode === 'daily');
+  markSelected($('practice'), mode === 'practice');
+  $('stampLabel').textContent = mode === 'daily' ? 'Daily puzzle' : 'Practice';
+  $('stamp').textContent = mode === 'daily' ? new Date().toLocaleDateString(undefined, {month:'short',day:'numeric'}) : '8 × 8';
+  ls('picross.v1.mode', mode);
+  save();
+  render();
+  sheet.classList.add('hide');
+}
+function render() {
+  const filled = Array(SIZE).fill(0);
+  let count = 0;
+  buttons.forEach((button, at) => {
+    const row = Math.floor(at / SIZE), col = at % SIZE, value = marks[at];
+    if (value === 1) { filled[row] |= 1 << col; count++; }
+    button.classList.toggle('filled', value === 1);
+    button.textContent = value === 2 ? '×' : '';
+    const describe = clue => clue ? clue.replaceAll(',', ' ') : '0';
+    button.setAttribute('aria-label', 'Row ' + (row+1) + ', column ' + (col+1) + ', ' + ['blank','filled','crossed'][value] +
+      '. Row clues ' + describe(rowClues[row]) + '. Column clues ' + describe(columnClues[col]));
+  });
+  const columns = transpose(filled);
+  filled.forEach((mask, i) => {
+    $('rows').children[i].classList.toggle('matched', runs(mask).join(',') === rowClues[i]);
+    $('columns').children[i].classList.toggle('matched', runs(columns[i]).join(',') === columnClues[i]);
+  });
+  solved = answer.every((row, i) => row === filled[i]);
+  $('progressLabel').textContent = solved ? 'Solved' : 'Filled';
+  $('count').textContent = count + ' / ' + answer.reduce((n, row) => n + runs(row).reduce((a,b) => a+b, 0), 0);
+  $('undo').disabled = !history.length || solved;
+  for (const button of buttons) button.disabled = solved;
+  $('fill').disabled = $('cross').disabled = solved;
+}
+function apply(at, value) {
+  if (solved || marks[at] === value) return;
+  marks[at] = value;
+  render();
+  save();
+  if (solved) {
+    drag = null;
+    $('result').textContent = mode === 'daily' ? 'Daily puzzle complete.' : 'Practice puzzle complete.';
+    sheet.classList.remove('hide');
+    $('view').focus();
+  }
+}
+function beginMark(at, kind) {
+  history.push(marks.slice());
+  if (history.length > 100) history.shift();
+  const value = marks[at] === kind ? 0 : kind;
+  apply(at, value);
+  return value;
+}
+cells.addEventListener('pointerdown', event => {
+  const button = event.target.closest('.cell');
+  if (!button || solved || !event.isPrimary || (event.button !== 0 && event.button !== 2)) return;
+  event.preventDefault();
+  button.focus({preventScroll:true});
+  const value = beginMark(Number(button.dataset.at), event.button === 2 || event.ctrlKey ? 2 : tool);
+  if (!solved) {
+    drag = {id:event.pointerId, value};
+    cells.setPointerCapture(event.pointerId);
+  }
+});
+cells.addEventListener('pointermove', event => {
+  if (!drag || event.pointerId !== drag.id) return;
+  const button = document.elementFromPoint(event.clientX, event.clientY)?.closest('.cell');
+  if (button && cells.contains(button)) apply(Number(button.dataset.at), drag.value);
+});
+cells.addEventListener('lostpointercapture', () => { drag = null; });
+cells.addEventListener('contextmenu', event => event.preventDefault());
+cells.addEventListener('click', event => {
+  if (event.detail === 0 && event.target.matches('.cell') && !solved) beginMark(Number(event.target.dataset.at), tool);
+});
+enableGridNavigation(cells, '.cell', () => !solved);
+window.addEventListener('keydown', event => {
+  if (gameKey(event) !== 'x' || event.repeat || solved || !document.activeElement.matches('.cell')) return;
+  event.preventDefault();
+  beginMark(Number(document.activeElement.dataset.at), 2);
+});
+function chooseTool(value) {
+  tool = value;
+  markSelected($('fill'), value === 1);
+  markSelected($('cross'), value === 2);
+}
+$('fill').onclick = () => chooseTool(1);
+$('cross').onclick = () => chooseTool(2);
+$('undo').onclick = () => { if (history.length && !solved) { marks = history.pop(); render(); save(); } };
+$('daily').onclick = () => { if (mode !== 'daily' || seed !== localDay()) loadPuzzle('daily'); };
+$('practice').onclick = () => { if (mode !== 'practice') loadPuzzle('practice'); };
+$('newbtn').onclick = () => loadPuzzle('practice', true);
+$('view').onclick = () => { sheet.classList.add('hide'); $(mode).focus(); };
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && mode === 'daily' && seed !== localDay()) loadPuzzle('daily');
+});
+chooseTool(1);
+loadPuzzle(ls('picross.v1.mode') === 'practice' ? 'practice' : 'daily');
+</script>
+</body>
+</html>
